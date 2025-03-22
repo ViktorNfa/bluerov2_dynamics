@@ -22,15 +22,17 @@ if use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command
-u_thrusters = np.array([0.3, 0.3, 0, 0, 0, 0, 0, 0])
+u_thrusters = np.array([0.3, 0.3, 0.3, 1, 1, 1, 1, 1])
 
+# 5) Solve
 def ode_func(t, x):
     # dt=0.0 => solver manages timesteps
     return rov.dynamics(x, u_thrusters, dt=0.0)
 
-# 5) Solve
 t_end = 5.0
 t_eval = np.arange(0, t_end, 0.01)
+
+print(f"Starting ODE integration for t=[0..{t_end}] at dt={0.01}")
 
 sol = solve_ivp(
     fun=ode_func,
