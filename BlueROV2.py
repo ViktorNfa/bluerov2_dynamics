@@ -445,7 +445,7 @@ class Tether:
             p_list.append(pi)
             v_list.append(vi)
 
-        def get_pos(i):
+        def _get_pos(i):
             if i == 0:
                 return anchor_pos
             elif i == self.n:
@@ -453,14 +453,14 @@ class Tether:
             else:
                 return p_list[i-1]
 
-        def get_vel(i):
+        def _get_vel(i):
             if (i == 0) or (i == self.n):
                 return np.zeros(3)
             else:
                 return v_list[i-1]
 
         # Example tension law that clamps to zero if dist < l0
-        def tension(r):
+        def _tension(r):
             dist = np.linalg.norm(r)
             if dist < 1e-9:
                 return np.zeros(3)
@@ -470,7 +470,7 @@ class Tether:
             scale = self.Et*self.Across/self.l0*(1.0 - self.l0/dist)
             return scale*r
 
-        def drag_force(vi):
+        def _drag_force(vi):
             vrel = vi - current_ned
             spd  = np.linalg.norm(vrel)
             if spd<1e-9:
@@ -480,7 +480,7 @@ class Tether:
             F = 0.5*self.rho*Cd*area*(spd**2)
             return F*(vrel/spd)
 
-        def damping(vi):
+        def _damping(vi):
             return -self.c_internal*vi
 
         dp_list = []
@@ -488,17 +488,17 @@ class Tether:
         for i in range(1, self.n):
             if i == self.n:
                 continue
-            pi   = get_pos(i)
-            vi   = get_vel(i)
-            pim1 = get_pos(i-1)
-            pip1 = get_pos(i+1)
+            pi   = _get_pos(i)
+            vi   = _get_vel(i)
+            pim1 = _get_pos(i-1)
+            pip1 = _get_pos(i+1)
 
             r_i_im1 = pi - pim1
-            Ti = tension(r_i_im1)
+            Ti = _tension(r_i_im1)
             r_ip1_i = pip1 - pi
-            Tip1 = tension(r_ip1_i)
+            Tip1 = _tension(r_ip1_i)
 
-            F_net = (Tip1 - Ti) - drag_force(vi) + damping(vi)
+            F_net = (Tip1 - Ti) - _drag_force(vi) + _damping(vi)
             a_i   = F_net / self.node_mass
             dp_list.append(vi)
             dv_list.append(a_i)
@@ -508,8 +508,8 @@ class Tether:
         dx_teth = np.concatenate([dp_flat, dv_flat])
 
         # Tension on ROV => from segment n
-        p_n_1 = get_pos(self.n - 1)
-        p_n   = get_pos(self.n)
+        p_n_1 = _get_pos(self.n - 1)
+        p_n   = _get_pos(self.n)
         r_n_1_n = p_n - p_n_1
-        Tn = tension(r_n_1_n)
+        Tn = _tension(r_n_1_n)
         return dx_teth, Tn
