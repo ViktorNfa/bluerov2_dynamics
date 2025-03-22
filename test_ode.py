@@ -10,12 +10,12 @@ x0 = np.zeros(12)
 x0[2] = 5.0
 
 # 3) Optionally enable tether
-use_tether = False
+use_tether = True
 if use_tether:
     rov.use_tether = True
     rov.tether = Tether(n_segments=5, length=20.0)
     rov.anchor_pos = np.array([0.0, 0.0, 0.0])  # anchor in NED
-    rov_start_ned = x0[0:2]  # ROV start in NED
+    rov_start_ned = x0[0:3]  # ROV start in NED
 
     # Initialize tether nodes along a straight line, zero velocity
     x_teth_init = rov.tether.init_nodes_line(rov.anchor_pos, rov_start_ned)
