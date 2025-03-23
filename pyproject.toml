@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "blue_rov2py"
+version = "0.1.0"
+description = "A Python package for Blue ROV2 control models"
+authors = ["Author One <author1@example.com>", "Author Two <author2@example.com>"]
+license = "MIT"  # Adjust this if your project uses a different license
+readme = "README.md"
+homepage = "https://github.com/yourusername/blue_rov2py"  # Replace with your GitHub repo URL
+repository = "https://github.com/yourusername/blue_rov2py"  # Optional, for your repository URL
+keywords = ["blue-rov", "robotics", "control-models"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+casadi = "^3.5"  # Add version number based on your use
+numpy = "^1.21"
+scipy = "^1.7"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2"  # If you're using pytest for testing
+
+[tool.poetry.scripts]
+blue_rov2py = "blue_rov2py.main:main"  # Optional, define entry point for your project if you have one
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
