@@ -35,18 +35,8 @@ Both the Euler and ODE methods should yield consistent results (though the impli
 ## Installation
 
 1. Clone or download this repository.
-2. Install dependencies:
-    ```bash
-    pip install numpy scipy
-    ```
-3. Run:
-    ```
-    python test_euler.py
-    ```
-    or
-    ```
-    python test_ode.py
-    ```
+2. Create a virtual environment ``python3 -m venv .venv``
+3. Install the package with ``pip install .``
 
 ---
 
