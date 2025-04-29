@@ -20,8 +20,8 @@ import numpy as np
 
 def rotation_matrix(phi, theta, psi):
     """
-    Basic Z-Y-X Euler-angles rotation matrix R_{n->b}.
-    If you store orientation as [phi, theta, psi], define R_{b->n} = R^T.
+    Basic Z-Y-X Euler-angles rotation matrix R_{b->n}.
+    Storing orientation as [phi, theta, psi]. Note that R_{n->b} = R^T.
     """
     cphi = np.cos(phi)
     sphi = np.sin(phi)
@@ -30,11 +30,11 @@ def rotation_matrix(phi, theta, psi):
     cpsi = np.cos(psi)
     spsi = np.sin(psi)
 
-    # R_{n->b} = Rz(psi)*Ry(theta)*Rx(phi)
+    # R_{b->n} = Rz(psi)*Ry(theta)*Rx(phi)
     R = np.array([
-        [cpsi*cth, spsi*cth, -sth],
-        [-spsi*cphi + cpsi*sth*sphi, cpsi*cphi + sphi*sth*spsi, cth*sphi],
-        [spsi*sphi + cpsi*cphi*sth, -cpsi*sphi + sth*spsi*cphi, cth*cphi]
+        [cpsi*cth, -spsi*cphi + cpsi*sth*sphi, spsi*sphi + cpsi*cphi*sth],
+        [spsi*cth, cpsi*cphi + sphi*sth*spsi, -cpsi*sphi + sth*spsi*cphi],
+        [-sth, cth*sphi, cth*cphi]
     ], dtype=float)
     return R
 
@@ -308,15 +308,15 @@ class BlueROV2:
         return CRB + CA
 
     def _damping(self, nu_r):
-        u, v, w, p, q, r = nu_r
+        u_r, v_r, w_r, p_r, q_r, r_r = nu_r
         # Damping matrix
         D = np.zeros((6,6), float)
-        D[0,0] = -self.Xu - self.Xu_abs*abs(u)
-        D[1,1] = -self.Yv - self.Yv_abs*abs(v)
-        D[2,2] = -self.Zw - self.Zw_abs*abs(w)
-        D[3,3] = -self.Kp - self.Kp_abs*abs(p)
-        D[4,4] = -self.Mq - self.Mq_abs*abs(q)
-        D[5,5] = -self.Nr - self.Nr_abs*abs(r)
+        D[0,0] = -self.Xu - self.Xu_abs*abs(u_r)
+        D[1,1] = -self.Yv - self.Yv_abs*abs(v_r)
+        D[2,2] = -self.Zw - self.Zw_abs*abs(w_r)
+        D[3,3] = -self.Kp - self.Kp_abs*abs(p_r)
+        D[4,4] = -self.Mq - self.Mq_abs*abs(q_r)
+        D[5,5] = -self.Nr - self.Nr_abs*abs(r_r)
         return D
 
     def _restoring(self, phi, theta, psi):
@@ -337,8 +337,8 @@ class BlueROV2:
 
     def dynamics(self, x, u_thrust, dt=0.01):
         """
-        Main 6-DOF ODE step:
-          x = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
+        Main 6-DOF (with velocities) ODE step:
+          x = [eta, nu] = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
         u_thrust in R^8 => normalized (voltage) thruster commands in [-1,1].
         dt is included so we can also integrate tether if needed.
 
