@@ -17,13 +17,6 @@ Date:   2025
 
 import numpy as np
 
-def svec(x):
-    """Skew-symmetric matrix from 3-vector x."""
-    return np.array([
-        [0,     -x[2],  x[1]],
-        [x[2],   0,    -x[0]],
-        [-x[1],  x[0],  0   ]
-    ], dtype=float)
 
 def rotation_matrix(phi, theta, psi):
     """
@@ -39,9 +32,9 @@ def rotation_matrix(phi, theta, psi):
 
     # R_{n->b} = Rz(psi)*Ry(theta)*Rx(phi)
     R = np.array([
-        [ cth*cpsi,  cth*spsi, -sth    ],
-        [ sphi*sth*cpsi - cphi*spsi, sphi*sth*spsi + cphi*cpsi, sphi*cth ],
-        [ cphi*sth*cpsi + sphi*spsi, cphi*sth*spsi - sphi*cpsi, cphi*cth ]
+        [cpsi*cth, spsi*cth, -sth],
+        [-spsi*cphi + cpsi*sth*sphi, cpsi*cphi + sphi*sth*spsi, cth*sphi],
+        [spsi*sphi + cpsi*cphi*sth, -cpsi*sphi + sth*spsi*cphi, cth*cphi]
     ], dtype=float)
     return R
 
@@ -57,9 +50,9 @@ def euler_kinematics_matrix(phi, theta):
         cth = 1e-7*np.sign(cth)
 
     return np.array([
-        [1.0, sphi*tth,  cphi*tth],
-        [0.0, cphi,     -sphi    ],
-        [0.0, sphi/cth,  cphi/cth]
+        [1.0, sphi*tth, cphi*tth],
+        [0.0, cphi, -sphi],
+        [0.0, sphi/cth, cphi/cth]
     ], dtype=float)
 
 
@@ -80,8 +73,8 @@ class BlueROV2:
     def __init__(self, rho=1000.0):
         # Physical parameters from the paper's Table A1 (heavy config).
         self.rho = rho
-        self.g   = 9.82
-        self.m   = 13.5
+        self.g = 9.82
+        self.m = 13.5
         self.volume = 0.0134
         self.W = self.m * self.g
         self.B = self.rho*self.g*self.volume
@@ -109,36 +102,36 @@ class BlueROV2:
         self.MRB[5,5] = self.Iz
 
         # Added mass
-        self.Xu_dot =  6.36
-        self.Yv_dot =  7.12
+        self.Xu_dot = 6.36
+        self.Yv_dot = 7.12
         self.Zw_dot = 18.68
-        self.Kp_dot =  0.189
-        self.Mq_dot =  0.135
-        self.Nr_dot =  0.222
+        self.Kp_dot = 0.189
+        self.Mq_dot = 0.135
+        self.Nr_dot = 0.222
         self.MA = np.zeros((6,6), float)
-        self.MA[0,0] = self.Xu_dot
-        self.MA[1,1] = self.Yv_dot
-        self.MA[2,2] = self.Zw_dot
-        self.MA[3,3] = self.Kp_dot
-        self.MA[4,4] = self.Mq_dot
-        self.MA[5,5] = self.Nr_dot
+        self.MA[0,0] = -self.Xu_dot
+        self.MA[1,1] = -self.Yv_dot
+        self.MA[2,2] = -self.Zw_dot
+        self.MA[3,3] = -self.Kp_dot
+        self.MA[4,4] = -self.Mq_dot
+        self.MA[5,5] = -self.Nr_dot
 
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
 
         # Damping
-        self.Xu =   13.7
+        self.Xu = 13.7
         self.Xu_abs = 141.0
-        self.Yv =    0.0
+        self.Yv = 0.0
         self.Yv_abs = 217.0
-        self.Zw =   33.0
-        self.Zw_abs =190.0
-        self.Kp =    0.0
-        self.Kp_abs =1.19
-        self.Mq =    0.8
-        self.Mq_abs =0.47
-        self.Nr =    0.0
-        self.Nr_abs =1.5
+        self.Zw = 33.0
+        self.Zw_abs = 190.0
+        self.Kp = 0.0
+        self.Kp_abs = 1.19
+        self.Mq = 0.8
+        self.Mq_abs = 0.47
+        self.Nr = 0.0
+        self.Nr_abs = 1.5
 
         # Thrusters
         self.n_thrusters = 8
@@ -150,53 +143,91 @@ class BlueROV2:
         # ---------------------------------------------------------------------
         # Tether fields (default off).
         self.use_tether    = False
-        self.tether        = None      # a Tether object
-        self.tether_state  = None      # shape (n-1)*6
-        self.anchor_pos    = np.zeros(3)  # top side anchor in NED
+        self.tether        = None           # a Tether object
+        self.tether_state  = None           # shape (n-1)*6
+        self.anchor_pos    = np.zeros(3)    # top side anchor in NED
         # ---------------------------------------------------------------------
+
+    def thruster_rotational_matrix(self, alpha):
+        """
+        The thrusters are located in a circular pattern and the rotation matrix used is denoted.
+        """
+        salp = np.sin(alpha)
+        calp = np.cos(alpha)
+
+        return np.array([
+            [calp, -salp, 0.0],
+            [salp, calp, 0.0],
+            [0.0, 0.0,  1.0]
+        ], dtype=float)
 
     def _define_thruster_placements(self):
         thruster_list = []
 
+        # Thrusters positions
+        r1234 = np.array([0.156, 0.111, 0.085]).reshape(3,1)
+        r5678 = np.array([0.12, 0.218, 0.0]).reshape(3,1)
+
+        # Thrusters orientations
+        e1234 = np.array([1.0/np.sqrt(2), -1.0/np.sqrt(2), 0.0]).reshape(3,1)
+
+        # Thrusters rotational matrices
+        J3_r1 = self.thruster_rotational_matrix(0.0)
+        J3_r2 = self.thruster_rotational_matrix(5.05)
+        J3_r3 = self.thruster_rotational_matrix(1.91)
+        J3_r4 = self.thruster_rotational_matrix(np.pi)
+        J3_r5 = self.thruster_rotational_matrix(0.0)
+        J3_r6 = self.thruster_rotational_matrix(4.15)
+        J3_r7 = self.thruster_rotational_matrix(1.01)
+        J3_r8 = self.thruster_rotational_matrix(np.pi)
+
+        J3_e1 = self.thruster_rotational_matrix(0.0)
+        J3_e2 = self.thruster_rotational_matrix(np.pi/2)
+        J3_e3 = self.thruster_rotational_matrix(3*np.pi/2)
+        J3_e4 = self.thruster_rotational_matrix(np.pi)
+
         # Horizontal-plane thrusters T1..T4
         thruster_list.append({
-            'r':  np.array([ 0.156,  0.111,  0.0]),
-            'dir':np.array([ 1.0/np.sqrt(2), -1.0/np.sqrt(2), 0.0])
+            'r':    np.dot(J3_r1,r1234),
+            'dir':  np.dot(J3_e1, e1234)
         })
         thruster_list.append({
-            'r':  np.array([ 0.156, -0.111,  0.0]),
-            'dir':np.array([ 1.0/np.sqrt(2),  1.0/np.sqrt(2), 0.0])
+            'r':    np.dot(J3_r2,r1234),
+            'dir':  np.dot(J3_e2, e1234)
         })
         thruster_list.append({
-            'r':  np.array([-0.156,  0.111,  0.0]),
-            'dir':np.array([-1.0/np.sqrt(2), -1.0/np.sqrt(2), 0.0])
+            'r':    np.dot(J3_r3,r1234),
+            'dir':  np.dot(J3_e3, e1234)
         })
         thruster_list.append({
-            'r':  np.array([-0.156, -0.111,  0.0]),
-            'dir':np.array([-1.0/np.sqrt(2),  1.0/np.sqrt(2), 0.0])
+            'r':    np.dot(J3_r4,r1234),
+            'dir':  np.dot(J3_e4, e1234)
         })
 
         # Vertical thrusters T5..T8
         thruster_list.append({
-            'r':  np.array([ 0.120,  0.218,  0.0]),
-            'dir':np.array([ 0.0,    0.0,   -1.0])
+            'r':    np.dot(J3_r5,r5678),
+            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
         })
         thruster_list.append({
-            'r':  np.array([ 0.120, -0.218,  0.0]),
-            'dir':np.array([ 0.0,    0.0,   -1.0])
+            'r':    np.dot(J3_r6,r5678),
+            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
         })
         thruster_list.append({
-            'r':  np.array([-0.120,  0.218,  0.0]),
-            'dir':np.array([ 0.0,    0.0,   -1.0])
+            'r':    np.dot(J3_r7,r5678),
+            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
         })
         thruster_list.append({
-            'r':  np.array([-0.120, -0.218,  0.0]),
-            'dir':np.array([ 0.0,    0.0,   -1.0])
+            'r':    np.dot(J3_r8,r5678),
+            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
         })
         return thruster_list
 
     def _thruster_force_from_input(self, V):
-        """Polynomial from the paper for T200 thrusters."""
+        """
+        Polynomial from the paper for T200 thrusters.
+        Note that the input is the voltage V and it's normalized to [-1,1].
+        """
         V3 = V**3
         V5 = V**5
         V7 = V**7
@@ -204,11 +235,14 @@ class BlueROV2:
         return -140.3*V9 + 389.9*V7 - 404.1*V5 + 176.0*V3 + 8.9*V
 
     def compute_thruster_forces(self, u_thrust):
+        """
+        The input is voltage per thruster normalized to [-1,1].
+        """
         tau = np.zeros(6, dtype=float)
         for i in range(self.n_thrusters):
             F_i = self._thruster_force_from_input(u_thrust[i])
-            dvec = self.thrusters_r[i]['dir']
-            rvec = self.thrusters_r[i]['r']
+            dvec = self.thrusters_r[i]['dir'].ravel()
+            rvec = self.thrusters_r[i]['r'].ravel()
             f_xyz = F_i * dvec
             m_xyz = np.cross(rvec, f_xyz)
             tau[0:3] += f_xyz
@@ -230,14 +264,19 @@ class BlueROV2:
         CRB[1,5] =  m*u
         CRB[2,3] =  m*v
         CRB[2,4] = -m*u
-        CRB[3,4] =  Iz*r
+        CRB[3,1] =  m*w
+        CRB[3,2] = -m*v
+        CRB[3,4] = -Iz*r
         CRB[3,5] = -Iy*q
-        CRB[4,3] = -Iz*r
+        CRB[4,0] = -m*w
+        CRB[4,2] =  m*u
+        CRB[4,3] =  Iz*r
         CRB[4,5] =  Ix*p
+        CRB[5,0] =  m*v
+        CRB[5,1] = -m*u
         CRB[5,3] =  Iy*q
         CRB[5,4] = -Ix*p
 
-        CA = np.zeros((6,6), float)
         Xudot = self.Xu_dot
         Yvdot = self.Yv_dot
         Zwdot = self.Zw_dot
@@ -245,16 +284,24 @@ class BlueROV2:
         Mqdot = self.Mq_dot
         Nrdot = self.Nr_dot
 
+        CA = np.zeros((6,6), float)
+        # Hydrodynamics part
         CA[0,4] = -Zwdot*w
         CA[0,5] =  Yvdot*v
         CA[1,3] =  Zwdot*w
         CA[1,5] = -Xudot*u
         CA[2,3] = -Yvdot*v
         CA[2,4] =  Xudot*u
+        CA[3,1] = -Zwdot*w
+        CA[3,2] =  Yvdot*v
         CA[3,4] = -Nrdot*r
         CA[3,5] =  Mqdot*q
+        CA[4,0] =  Zwdot*w
+        CA[4,2] = -Xudot*u
         CA[4,3] =  Nrdot*r
         CA[4,5] = -Kpdot*p
+        CA[5,0] = -Yvdot*v
+        CA[5,1] =  Xudot*u
         CA[5,3] = -Mqdot*q
         CA[5,4] =  Kpdot*p
 
@@ -262,37 +309,37 @@ class BlueROV2:
 
     def _damping(self, nu_r):
         u, v, w, p, q, r = nu_r
+        # Damping matrix
         D = np.zeros((6,6), float)
-        D[0,0] = self.Xu + self.Xu_abs*abs(u)
-        D[1,1] = self.Yv + self.Yv_abs*abs(v)
-        D[2,2] = self.Zw + self.Zw_abs*abs(w)
-        D[3,3] = self.Kp + self.Kp_abs*abs(p)
-        D[4,4] = self.Mq + self.Mq_abs*abs(q)
-        D[5,5] = self.Nr + self.Nr_abs*abs(r)
+        D[0,0] = -self.Xu - self.Xu_abs*abs(u)
+        D[1,1] = -self.Yv - self.Yv_abs*abs(v)
+        D[2,2] = -self.Zw - self.Zw_abs*abs(w)
+        D[3,3] = -self.Kp - self.Kp_abs*abs(p)
+        D[4,4] = -self.Mq - self.Mq_abs*abs(q)
+        D[5,5] = -self.Nr - self.Nr_abs*abs(r)
         return D
 
     def _restoring(self, phi, theta, psi):
         W_minus_B = self.W - self.B
+        sphi = np.sin(phi)
+        cphi = np.cos(phi)
+        sth  = np.sin(theta)
+        cth  = np.cos(theta)
+        # Restoring forces and moments
         gvec = np.zeros(6, float)
-        gvec[0] =  W_minus_B * np.sin(theta)
-        gvec[1] = -W_minus_B * np.cos(theta)*np.sin(phi)
-        gvec[2] = -W_minus_B * np.cos(theta)*np.cos(phi)
-
-        phi_s = np.sin(phi)
-        phi_c = np.cos(phi)
-        th_s  = np.sin(theta)
-        th_c  = np.cos(theta)
-
-        gvec[3] = - (self.yb*self.B)*th_c*phi_c + ( self.zb*self.B)*th_c*phi_s
-        gvec[4] = - (self.zb*self.B)*th_s - (self.xb*self.B)*th_c*phi_c
-        gvec[5] =   (self.xb*self.B)*th_c*phi_s + (self.yb*self.B)*th_s
+        gvec[0] =  W_minus_B * sth
+        gvec[1] = -W_minus_B * cth*sphi
+        gvec[2] = -W_minus_B * cth*cphi
+        gvec[3] =  (self.yb*self.B)*cth*cphi - (self.zb*self.B)*cth*sphi
+        gvec[4] = -(self.zb*self.B)*sth - (self.xb*self.B)*cth*cphi
+        gvec[5] =  (self.xb*self.B)*cth*sphi + (self.yb*self.B)*sth
         return gvec
 
     def dynamics(self, x, u_thrust, dt=0.01):
         """
         Main 6-DOF ODE step:
           x = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
-        u_thrust in R^8 => normalized thruster commands in [-1..1].
+        u_thrust in R^8 => normalized (voltage) thruster commands in [-1,1].
         dt is included so we can also integrate tether if needed.
 
         Returns xdot of the same dimension (12,).
@@ -313,7 +360,7 @@ class BlueROV2:
         nu_r[:3] -= v_c_b
 
         # 4) system matrices
-        Cmat = self._coriolis(nu_r)
+        Cmat = self._coriolis(nu)
         Dmat = self._damping(nu_r)
         gvec = self._restoring(phi, theta, psi)
 

@@ -20,15 +20,15 @@ if use_tether:
     x_teth_init = rov.tether.init_nodes_line(rov.anchor_pos, rov_start_ned)
     rov.tether_state = x_teth_init
 
-# 4) Some thruster command
-u_thrusters = np.array([0.3, 0.3, 0.3, 1, 1, 1, 1, 1])
+# 4) Some thruster command (the input is voltage normalized to [-1,1])
+u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
 
 # 5) Simple Euler integration parameters
 dt = 0.01
 t_end = 5.0
 n_steps = int(t_end / dt)
 
-print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
+# print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
 
 # 6) Euler Integration Loop
 for step in range(n_steps):
@@ -39,4 +39,4 @@ for step in range(n_steps):
 
     # 6c) Print 
     t = step*dt
-    print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f})")
+    # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f})")
