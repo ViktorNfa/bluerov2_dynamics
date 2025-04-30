@@ -31,9 +31,10 @@ n_steps = int(t_end / dt)
 print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
 
 # 6) Euler Integration Loop
+xdot = np.zeros(12)  # Initialize state derivative
 for step in range(n_steps):
     # 6a) Get state derivative
-    xdot = rov.dynamics(x, u_thrusters, dt)
+    xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
     # 6b) Euler update
     x += dt * xdot
 

@@ -335,7 +335,7 @@ class BlueROV2:
         gvec[5] =  (self.xb*self.B)*cth*sphi + (self.yb*self.B)*sth
         return gvec
 
-    def dynamics(self, x, u_thrust, dt=0.01):
+    def dynamics(self, x, u_thrust, dt=0.01, rov_vel_ned=0):
         """
         Main 6-DOF (with velocities) ODE step:
           x = [eta, nu] = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
@@ -376,6 +376,7 @@ class BlueROV2:
                 self.tether_state,
                 self.anchor_pos,
                 rov_pos_ned,
+                rov_vel_ned,
                 self.current_speed
             )
             self.tether_state += dt * dx_t
@@ -411,7 +412,7 @@ class Tether:
     The internal nodes 1...n-1 are states in x_teth.
 
     x_teth shape = (n-1)*6 => [p1...p_{n-1}, v1...v_{n-1}],
-    each p_i,v_i is a 3D vector in NED.
+    each p_i or v_i is a 3D vector in NED.
     
     Example usage:
       tether = Tether(n_segments=5, length=20.0)
@@ -469,10 +470,11 @@ class Tether:
         v_flat = np.array(v_array).ravel()
         return np.concatenate([p_flat, v_flat])
 
-    def dynamics(self, x_teth, anchor_pos, rov_pos, current_ned):
+    def dynamics(self, x_teth, anchor_pos, rov_pos, rov_vel, current_ned):
         """
         anchor_pos: (3,) top-side in NED
         rov_pos:    (3,) ROV in NED
+        rov_vel:    (3,) ROV velocity in NED
         current_ned:(3,) current velocity in NED
         returns: dx_teth, F_teth_ned
         """
@@ -500,16 +502,16 @@ class Tether:
                 return p_list[i-1]
 
         def _get_vel(i):
-            if (i == 0) or (i == self.n):
+            if i == 0:
                 return np.zeros(3)
+            elif i == self.n:
+                return rov_vel
             else:
                 return v_list[i-1]
 
-        # Example tension law that clamps to zero if dist < l0
+        # Tension law that clamps to zero if dist < l0
         def _tension(r):
             dist = np.linalg.norm(r)
-            if dist < 1e-9:
-                return np.zeros(3)
             # If segment is shorter than nominal => slack => no tension
             if dist <= self.l0:
                 return np.zeros(3)
@@ -534,6 +536,7 @@ class Tether:
         for i in range(1, self.n):
             if i == self.n:
                 continue
+
             pi   = _get_pos(i)
             vi   = _get_vel(i)
             pim1 = _get_pos(i-1)
