@@ -70,7 +70,7 @@ class BlueROV2:
     a tension force is added in body-frame.
     """
 
-    def __init__(self, rho=1000.0):
+    def __init__(self, rho=1000.0, current_speed=np.array([0.0, 0.0, 0.0])):
         # Physical parameters from the paper's Table A1 (heavy config).
         self.rho = rho
         self.g = 9.82
@@ -137,8 +137,8 @@ class BlueROV2:
         self.n_thrusters = 8
         self.thrusters_r = self._define_thruster_placements()
 
-        # Current in NED
-        self.current_speed = np.array([0.0, 0.0, 0.0])
+        # Current in NED (assume irrotational, constant speed)
+        self.current_speed = current_speed
 
         # ---------------------------------------------------------------------
         # Tether fields (default off).
@@ -165,11 +165,11 @@ class BlueROV2:
         thruster_list = []
 
         # Thrusters positions
-        r1234 = np.array([0.156, 0.111, 0.085]).reshape(3,1)
-        r5678 = np.array([0.12, 0.218, 0.0]).reshape(3,1)
+        r1234 = np.array([0.156, 0.111, 0.085])
+        r5678 = np.array([0.12, 0.218, 0.0])
 
         # Thrusters orientations
-        e1234 = np.array([1.0/np.sqrt(2), -1.0/np.sqrt(2), 0.0]).reshape(3,1)
+        e1234 = np.array([1.0/np.sqrt(2), -1.0/np.sqrt(2), 0.0])
 
         # Thrusters rotational matrices
         J3_r1 = self.thruster_rotational_matrix(0.0)
@@ -207,19 +207,19 @@ class BlueROV2:
         # Vertical thrusters T5..T8
         thruster_list.append({
             'r':    np.dot(J3_r5,r5678),
-            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
+            'dir':  np.array([0.0, 0.0, -1.0])
         })
         thruster_list.append({
             'r':    np.dot(J3_r6,r5678),
-            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
+            'dir':  np.array([0.0, 0.0, -1.0])
         })
         thruster_list.append({
             'r':    np.dot(J3_r7,r5678),
-            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
+            'dir':  np.array([0.0, 0.0, -1.0])
         })
         thruster_list.append({
             'r':    np.dot(J3_r8,r5678),
-            'dir':  np.array([0.0, 0.0, -1.0]).reshape(3,1)
+            'dir':  np.array([0.0, 0.0, -1.0])
         })
         return thruster_list
 
@@ -241,8 +241,8 @@ class BlueROV2:
         tau = np.zeros(6, dtype=float)
         for i in range(self.n_thrusters):
             F_i = self._thruster_force_from_input(u_thrust[i])
-            dvec = self.thrusters_r[i]['dir'].ravel()
-            rvec = self.thrusters_r[i]['r'].ravel()
+            dvec = self.thrusters_r[i]['dir']
+            rvec = self.thrusters_r[i]['r']
             f_xyz = F_i * dvec
             m_xyz = np.cross(rvec, f_xyz)
             tau[0:3] += f_xyz
@@ -350,8 +350,8 @@ class BlueROV2:
         phi, theta, psi = eta[3:6]
 
         # 2) transforms
-        R_n2b = rotation_matrix(phi, theta, psi)
-        R_b2n = R_n2b.T
+        R_b2n = rotation_matrix(phi, theta, psi) # Also called J1 in the paper
+        R_n2b = R_b2n.T
         J2    = euler_kinematics_matrix(phi, theta)
 
         # 3) relative velocity
@@ -360,8 +360,8 @@ class BlueROV2:
         nu_r[:3] -= v_c_b
 
         # 4) system matrices
-        Cmat = self._coriolis(nu)
-        Dmat = self._damping(nu_r)
+        C = self._coriolis(nu)
+        D = self._damping(nu_r)
         gvec = self._restoring(phi, theta, psi)
 
         # 5) thrusters
@@ -376,23 +376,22 @@ class BlueROV2:
                 self.tether_state,
                 self.anchor_pos,
                 rov_pos_ned,
-                self.current_speed,
-                dt
+                self.current_speed
             )
             self.tether_state += dt * dx_t
             # Convert that force to body frame and add
             F_teth_b = R_n2b.dot(F_teth_ned)
-            # (For minimal example, we just add force in body; if tether attaches off-CG,
-            #  you'd also add a moment = cross(r_attach, F_teth_b).)
+            # We assume the tether attaches to CG so we just add force in body; 
+            # If tether attaches off-CG, you'd also add a moment = cross(r_attach, F_teth_b).
             tau_ext[0:3] += F_teth_b
 
         # 7) solve for nu_dot
-        rhs = tau_ext - Cmat.dot(nu_r) - Dmat.dot(nu_r) - gvec
+        rhs = tau_ext - C.dot(nu_r) - D.dot(nu_r) - gvec
         nu_dot = self.Minv.dot(rhs)
 
         # 8) compute eta_dot
-        p_dot_n = R_b2n.dot(nu[0:3])  # position
-        eul_rates = J2.dot(nu[3:6])   # orientation
+        p_dot_n = R_b2n.dot(nu[0:3])  # linear velocity in n-frame
+        eul_rates = J2.dot(nu[3:6])   # orientation rates in n-frame
         eta_dot = np.concatenate([p_dot_n, eul_rates])
 
         # 9) pack
@@ -409,9 +408,9 @@ class Tether:
     Lumped-mass tether model from von Benzon et al. references.
     Node 0: anchor at anchor_pos (fixed).
     Node n: ROV at rov_pos (fixed).
-    The internal nodes 1..n-1 are states in x_teth.
+    The internal nodes 1...n-1 are states in x_teth.
 
-    x_teth shape = (n-1)*6 => [p1..p_{n-1}, v1..v_{n-1}],
+    x_teth shape = (n-1)*6 => [p1...p_{n-1}, v1...v_{n-1}],
     each p_i,v_i is a 3D vector in NED.
     
     Example usage:
@@ -465,12 +464,12 @@ class Tether:
             p_i = anchor + alpha*(rovpos - anchor)
             p_array.append(p_i)
             v_array.append([0.0, 0.0, 0.0])
-
+        
         p_flat = np.array(p_array).ravel()
         v_flat = np.array(v_array).ravel()
         return np.concatenate([p_flat, v_flat])
 
-    def dynamics(self, x_teth, anchor_pos, rov_pos, current_ned, dt=0.01):
+    def dynamics(self, x_teth, anchor_pos, rov_pos, current_ned):
         """
         anchor_pos: (3,) top-side in NED
         rov_pos:    (3,) ROV in NED

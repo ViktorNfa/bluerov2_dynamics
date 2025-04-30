@@ -4,7 +4,7 @@ from BlueROV2 import BlueROV2, Tether
 # 1) Create ROV
 rov = BlueROV2()
 
-# 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5
+# 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5 in navigation (n) frame
 x = np.zeros(12)
 x[2] = 5.0
 
@@ -21,14 +21,14 @@ if use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
 
 # 5) Simple Euler integration parameters
 dt = 0.01
 t_end = 5.0
 n_steps = int(t_end / dt)
 
-# print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
+print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
 
 # 6) Euler Integration Loop
 for step in range(n_steps):
@@ -39,4 +39,4 @@ for step in range(n_steps):
 
     # 6c) Print 
     t = step*dt
-    # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f})")
+    # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {x[3]:.2f}, {x[4]:.2f}, {x[5]:.2f})")
