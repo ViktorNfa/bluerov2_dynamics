@@ -20,24 +20,61 @@ if use_tether:
     x_teth_init = rov.tether.init_nodes_line(rov.anchor_pos, rov_start_ned)
     rov.tether_state = x_teth_init
 
-# 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
 
-# 5) Simple Euler integration parameters
-dt = 0.01
-t_end = 5.0
-n_steps = int(t_end / dt)
 
-print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
+x_teth = x_teth_init
+n = 5
+rov_vel = np.zeros(3)
 
-# 6) Euler Integration Loop
-xdot = np.zeros(12)  # Initialize state derivative
-for step in range(n_steps):
-    # 6a) Get state derivative
-    xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
-    # 6b) Euler update
-    x += dt * xdot
+n_i = n - 1                        # number of internal nodes
 
-    # 6c) Print 
-    t = step*dt
-    # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {x[3]:.2f}, {x[4]:.2f}, {x[5]:.2f})")
+# ---------- 1. unpack the flattened state ---------------------------
+p_int = x_teth[:3 * n_i].reshape((n_i, 3))
+v_int = x_teth[3 * n_i:].reshape((n_i, 3))
+
+# full node lists  (0 … n)
+pos = [rov.anchor_pos, *p_int, rov_start_ned]
+vel = [np.zeros(3), *v_int, rov_vel]
+
+print(p_int)
+print(p_int.shape)
+print(v_int)
+print(v_int.shape)
+
+print(pos)
+print(pos[0])
+print(vel)
+print(vel[0])
+
+
+
+
+
+
+
+
+
+
+
+
+# # 4) Some thruster command (the input is voltage normalized to [-1,1])
+# u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
+
+# # 5) Simple Euler integration parameters
+# dt = 0.01
+# t_end = 5.0
+# n_steps = int(t_end / dt)
+
+# print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
+
+# # 6) Euler Integration Loop
+# xdot = np.zeros(12)  # Initialize state derivative
+# for step in range(n_steps):
+#     # 6a) Get state derivative
+#     xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
+#     # 6b) Euler update
+#     x += dt * xdot
+
+#     # 6c) Print 
+#     t = step*dt
+#     # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {x[3]:.2f}, {x[4]:.2f}, {x[5]:.2f})")

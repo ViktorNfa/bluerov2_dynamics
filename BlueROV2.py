@@ -468,6 +468,7 @@ class Tether:
         
         p_flat = np.array(p_array).ravel()
         v_flat = np.array(v_array).ravel()
+        print(p_flat)
         return np.concatenate([p_flat, v_flat])
 
     def dynamics(self, x_teth, anchor_pos, rov_pos, rov_vel, current_ned):
