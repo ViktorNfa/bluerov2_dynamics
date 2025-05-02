@@ -1,15 +1,16 @@
 import numpy as np
-from BlueROV2 import BlueROV2, Tether
+from BlueROV2 import BlueROV2, Tether, quat_from_euler, euler_from_quat
 
 # 1) Create ROV
 rov = BlueROV2()
 
 # 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5 in navigation (n) frame
-x = np.zeros(12)
+x = np.zeros(13)
 x[2] = 5.0
+x[3:7] = quat_from_euler(0,0,0)  # level attitude
 
 # 3) Optionally enable tether
-use_tether = True
+use_tether = False
 if use_tether:
     rov.use_tether = True
     rov.tether = Tether(n_segments=5, length=20.0)
@@ -20,61 +21,25 @@ if use_tether:
     x_teth_init = rov.tether.init_nodes_line(rov.anchor_pos, rov_start_ned)
     rov.tether_state = x_teth_init
 
+# 4) Some thruster command (the input is voltage normalized to [-1,1])
+u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, -0.5, 0.5, -0.5])
 
+# 5) Simple Euler integration parameters
+dt = 0.01
+t_end = 5.0
+n_steps = int(t_end / dt)
 
-x_teth = x_teth_init
-n = 5
-rov_vel = np.zeros(3)
+print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
 
-n_i = n - 1                        # number of internal nodes
+# 6) Euler Integration Loop
+xdot = np.zeros(12)  # Initialize state derivative
+for step in range(n_steps):
+    # 6a) Get state derivative
+    xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
+    # 6b) Euler update
+    x += dt * xdot
 
-# ---------- 1. unpack the flattened state ---------------------------
-p_int = x_teth[:3 * n_i].reshape((n_i, 3))
-v_int = x_teth[3 * n_i:].reshape((n_i, 3))
-
-# full node lists  (0 … n)
-pos = [rov.anchor_pos, *p_int, rov_start_ned]
-vel = [np.zeros(3), *v_int, rov_vel]
-
-print(p_int)
-print(p_int.shape)
-print(v_int)
-print(v_int.shape)
-
-print(pos)
-print(pos[0])
-print(vel)
-print(vel[0])
-
-
-
-
-
-
-
-
-
-
-
-
-# # 4) Some thruster command (the input is voltage normalized to [-1,1])
-# u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5])
-
-# # 5) Simple Euler integration parameters
-# dt = 0.01
-# t_end = 5.0
-# n_steps = int(t_end / dt)
-
-# print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
-
-# # 6) Euler Integration Loop
-# xdot = np.zeros(12)  # Initialize state derivative
-# for step in range(n_steps):
-#     # 6a) Get state derivative
-#     xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
-#     # 6b) Euler update
-#     x += dt * xdot
-
-#     # 6c) Print 
-#     t = step*dt
-#     # print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {x[3]:.2f}, {x[4]:.2f}, {x[5]:.2f})")
+    # 6c) Print 
+    t = step*dt
+    euler = euler_from_quat(x[3:7])  # Convert quaternion to euler angles in degrees
+    print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {euler[0]:.2f}, {euler[1]:.2f}, {euler[2]:.2f})")

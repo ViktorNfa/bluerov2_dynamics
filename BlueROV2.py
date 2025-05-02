@@ -18,6 +18,50 @@ Date:   2025
 import numpy as np
 
 
+def quat_from_euler(phi, theta, psi):
+    """ZYX Euler → quaternion [w,x,y,z] (scalar first)."""
+    c1, s1 = np.cos(psi*0.5),  np.sin(psi*0.5)
+    c2, s2 = np.cos(theta*0.5), np.sin(theta*0.5)
+    c3, s3 = np.cos(phi*0.5),   np.sin(phi*0.5)
+    w = c1*c2*c3 + s1*s2*s3
+    x = c1*c2*s3 - s1*s2*c3
+    y = c1*s2*c3 + s1*c2*s3
+    z = s1*c2*c3 - c1*s2*s3
+    return np.array([w,x,y,z], float)
+
+def euler_from_quat(q):
+    """Quaternion [w,x,y,z] → ZYX Euler angles."""
+    w,x,y,z = q
+    t0 = 2*(w*x + y*z)
+    t1 = 1 - 2*(x*x + y*y)
+    phi   = np.arctan2(t0, t1)
+    t2 = 2*(w*y - z*x)
+    t2 = np.clip(t2, -1.0, 1.0)
+    theta = np.arcsin(t2)
+    t3 = 2*(w*z + x*y)
+    t4 = 1 - 2*(y*y + z*z)
+    psi   = np.arctan2(t3, t4)
+    return np.array([phi, theta, psi], float)
+
+def omega_matrix(omega_b):
+    """Return the 4x4 Omega(omega) matrix so that q̇ = 0.5*Omega(omega)*q."""
+    p,q,r = omega_b
+    return np.array([
+        [0, -p, -q, -r],
+        [p,  0,  r, -q],
+        [q, -r,  0,  p],
+        [r,  q, -p,  0]
+    ], float)
+
+def quat_to_rot(q):
+    """Unit quaternion -> 3x3 rotation matrix."""
+    w,x,y,z = q
+    return np.array([
+        [1-2*(y*y+z*z), 2*(x*y - z*w), 2*(x*z + y*w)],
+        [2*(x*y + z*w), 1-2*(x*x+z*z), 2*(y*z - x*w)],
+        [2*(x*z - y*w), 2*(y*z + x*w), 1-2*(x*x+y*y)]
+    ], float)
+
 def rotation_matrix(phi, theta, psi):
     """
     Basic Z-Y-X Euler-angles rotation matrix R_{b->n}.
@@ -139,6 +183,9 @@ class BlueROV2:
 
         # Current in NED (assume irrotational, constant speed)
         self.current_speed = current_speed
+
+        # Quaternion that stores the vehicle attitude internally
+        self._q = None
 
         # ---------------------------------------------------------------------
         # Tether fields (default off).
@@ -337,66 +384,60 @@ class BlueROV2:
 
     def dynamics(self, x, u_thrust, dt=0.01, rov_vel_ned=0):
         """
-        Main 6-DOF (with velocities) ODE step:
-          x = [eta, nu] = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
-        u_thrust in R^8 => normalized (voltage) thruster commands in [-1,1].
-        dt is included so we can also integrate tether if needed.
-
-        Returns xdot of the same dimension (12,).
+        x = [x y z  q0 q1 q2 q3  u v w  p q r]  (13 states)
+        Returns the same layout for ẋ.
         """
-        # 1) unpack
-        eta = x[0:6]
-        nu  = x[6:12]
-        phi, theta, psi = eta[3:6]
+        # ---------------- unpack & quaternion ---------------------------
+        pos  = x[0:3]
+        q    = x[3:7]                       # attitude quaternion
+        nu   = x[7:13]
 
-        # 2) transforms
-        R_b2n = rotation_matrix(phi, theta, psi) # Also called J1 in the paper
+        # first call?  normalise & store
+        if self._q is None:
+            self._q = q / np.linalg.norm(q)
+        else:
+            self._q = q / np.linalg.norm(q) # keep unit length
+
+        R_b2n = quat_to_rot(self._q)
         R_n2b = R_b2n.T
-        J2    = euler_kinematics_matrix(phi, theta)
 
-        # 3) relative velocity
-        v_c_b = R_n2b.dot(self.current_speed)
-        nu_r = np.copy(nu)
+        # ---------------- relative velocity -----------------------------
+        v_c_b   = R_n2b.dot(self.current_speed)
+        nu_r    = np.copy(nu)
         nu_r[:3] -= v_c_b
 
-        # 4) system matrices
-        C = self._coriolis(nu)
-        D = self._damping(nu_r)
-        gvec = self._restoring(phi, theta, psi)
+        # ---------------- system matrices -------------------------------
+        C       = self._coriolis(nu)
+        D       = self._damping(nu_r)
 
-        # 5) thrusters
+        # restoring forces need Euler angles, obtain once and forget
+        phi, theta, psi = euler_from_quat(self._q)
+        gvec    = self._restoring(phi, theta, psi)
+
+        # ---------------- thruster + optional tether --------------------
         tau_thr = self.compute_thruster_forces(u_thrust)
-        tau_ext = np.copy(tau_thr)  # we can add tether or anything else to this
+        tau_ext = np.copy(tau_thr)
 
-        # 6) Tether logic (optional)
         if self.use_tether and (self.tether is not None) and (self.tether_state is not None):
-            # The ROV attachment is at x,y,z from "eta[:3]"
-            rov_pos_ned = eta[0:3]
             dx_t, F_teth_ned = self.tether.dynamics(
-                self.tether_state,
-                self.anchor_pos,
-                rov_pos_ned,
-                rov_vel_ned,
-                self.current_speed
+                self.tether_state, self.anchor_pos,
+                pos, rov_vel_ned, self.current_speed
             )
             self.tether_state += dt * dx_t
-            # Convert that force to body frame and add
-            F_teth_b = R_n2b.dot(F_teth_ned)
-            # We assume the tether attaches to CG so we just add force in body; 
-            # If tether attaches off-CG, you'd also add a moment = cross(r_attach, F_teth_b).
-            tau_ext[0:3] += F_teth_b
+            tau_ext[0:3] += R_n2b.dot(F_teth_ned)
 
-        # 7) solve for nu_dot
-        rhs = tau_ext - C.dot(nu_r) - D.dot(nu_r) - gvec
-        nu_dot = self.Minv.dot(rhs)
+        # ---------------- accelerations ---------------------------------
+        rhs     = tau_ext - C.dot(nu_r) - D.dot(nu_r) - gvec
+        nu_dot  = self.Minv.dot(rhs)
 
-        # 8) compute eta_dot
-        p_dot_n = R_b2n.dot(nu[0:3])  # linear velocity in n-frame
-        eul_rates = J2.dot(nu[3:6])   # orientation rates in n-frame
-        eta_dot = np.concatenate([p_dot_n, eul_rates])
+        # ---------------- kinematics ------------------------------------
+        p_dot_n = R_b2n.dot(nu[:3])                   # linear velocity in NED
+        q_dot   = 0.5 * omega_matrix(nu[3:6]).dot(self._q)
+        self._q = (self._q + dt*q_dot)
+        self._q /= np.linalg.norm(self._q)        # keep unit length
 
-        # 9) pack
-        x_dot = np.concatenate([eta_dot, nu_dot])
+        # ---------------- pack & return ---------------------------------
+        x_dot = np.concatenate([p_dot_n, q_dot, nu_dot])
         return x_dot
 
 
@@ -468,98 +509,86 @@ class Tether:
         
         p_flat = np.array(p_array).ravel()
         v_flat = np.array(v_array).ravel()
-        print(p_flat)
         return np.concatenate([p_flat, v_flat])
 
     def dynamics(self, x_teth, anchor_pos, rov_pos, rov_vel, current_ned):
         """
-        anchor_pos: (3,) top-side in NED
-        rov_pos:    (3,) ROV in NED
-        rov_vel:    (3,) ROV velocity in NED
-        current_ned:(3,) current velocity in NED
-        returns: dx_teth, F_teth_ned
+        anchor_pos : (3,)  fixed top-side point  (node 0)
+        rov_pos    : (3,)  ROV position         (node n)
+        rov_vel    : (3,)  ROV velocity
+        current_ned: (3,)  water-current velocity (expressed in NED)
+
+        Returns
+        --------
+        dx_teth : time derivative of x_teth  (shape (n-1)*6)
+        F_teth  : (3,) tether force on the ROV (τ_tet = T_{n-1})
         """
-        if (self.n < 2):
-            # no internal nodes => no tension
+        # 0) no tether -> nothing to do
+        if self.n < 2:                          # n = number of segments
             return np.zeros_like(x_teth), np.zeros(3)
 
-        num_i = self.n - 1
-        p_list = []
-        v_list = []
-        for i in range(num_i):
-            ip = 3*i
-            iv = 3*num_i + 3*i
-            pi = x_teth[ip:ip+3]
-            vi = x_teth[iv:iv+3]
-            p_list.append(pi)
-            v_list.append(vi)
+        n_i = self.n - 1                        # number of internal nodes
 
-        def _get_pos(i):
-            if i == 0:
-                return anchor_pos
-            elif i == self.n:
-                return rov_pos
+        # 1) unpack the flattened state
+        p_int = x_teth[:3 * n_i].reshape((n_i, 3))
+        v_int = x_teth[3 * n_i:].reshape((n_i, 3))
+
+        # full node lists  (0 … n)
+        pos = [anchor_pos, *p_int, rov_pos]
+        vel = [np.zeros(3), *v_int, rov_vel]
+
+        # 2) pre-compute segment quantities (k = 0 … n-1)
+        T = []          # axial tension   (Eq. 36)
+        P = []          # internal damping (Eq. 29)
+        F = []          # hydrodynamic drag (Eqs. 30-34)
+
+        for k in range(self.n):
+            r_k     = pos[k + 1] - pos[k]                       # vector node k -> k+1
+            L_k     = np.linalg.norm(r_k) + 1e-12               # avoid /0
+            r_hat   = r_k / L_k
+
+            # axial tension T_k  (Eq. 36)
+            if L_k > self.l0:                                   # slack → no tension
+                T_k = (self.Et * self.Across / self.l0) * (1 - self.l0 / L_k) * r_k
             else:
-                return p_list[i-1]
+                T_k = np.zeros(3)
+            T.append(T_k)
 
-        def _get_vel(i):
-            if i == 0:
-                return np.zeros(3)
-            elif i == self.n:
-                return rov_vel
-            else:
-                return v_list[i-1]
+            # internal damping P_k  (Eq. 29) 
+            v_rel_nodes = vel[k + 1] - vel[k]
+            P_k = self.c_internal * (np.dot(v_rel_nodes, r_hat)) * r_hat
+            P.append(P_k)
 
-        # Tension law that clamps to zero if dist < l0
-        def _tension(r):
-            dist = np.linalg.norm(r)
-            # If segment is shorter than nominal => slack => no tension
-            if dist <= self.l0:
-                return np.zeros(3)
-            scale = self.Et*self.Across/self.l0*(1.0 - self.l0/dist)
-            return scale*r
+            # external drag F_k  (Eqs. 31-34)
+            v_rel_flow = current_ned - vel[k]                   # flow at node k
+            v_perp     = np.dot(v_rel_flow, r_hat) * r_hat      # Eq. 33
+            v_tan      = v_rel_flow - v_perp                    # Eq. 34
 
-        def _drag_force(vi):
-            vrel = vi - current_ned
-            spd  = np.linalg.norm(vrel)
-            if spd<1e-9:
-                return np.zeros(3)
-            area = self.dtet*self.l0
-            Cd   = self.Cn
-            F = 0.5*self.rho*Cd*area*(spd**2)
-            return F*(vrel/spd)
+            sp_perp = np.linalg.norm(v_perp)
+            sp_tan  = np.linalg.norm(v_tan)
 
-        def _damping(vi):
-            return -self.c_internal*vi
+            F_perp = 0.5 * self.rho * self.dtet * self.Cn * L_k * sp_perp * v_perp
+            F_tan  = 0.5 * self.rho * self.dtet * self.Ct * L_k * sp_tan  * v_tan
+            F.append(F_perp + F_tan)                            # Eq. 30
 
+        # 3) node dynamics  (i = 1 … n-1)
         dp_list = []
         dv_list = []
-        for i in range(1, self.n):
-            if i == self.n:
-                continue
 
-            pi   = _get_pos(i)
-            vi   = _get_vel(i)
-            pim1 = _get_pos(i-1)
-            pip1 = _get_pos(i+1)
+        for i in range(1, self.n):                              # internal nodes only
+            # forces on node i   (Eq. 26 ⟹  F_net = T_i − T_{i−1} + P_{i-1} − P_i + F_i)
+            F_net = (
+                T[i] - T[i - 1] +
+                P[i - 1] - P[i] +
+                F[i]
+            )
 
-            r_i_im1 = pi - pim1
-            Ti = _tension(r_i_im1)
-            r_ip1_i = pip1 - pi
-            Tip1 = _tension(r_ip1_i)
+            a_i = F_net / self.node_mass                       # Mt,i ≈ node_mass
+            dp_list.append(vel[i])                             # ṗ_i   = v_i
+            dv_list.append(a_i)                                # v̇_i   = a_i
 
-            F_net = (Tip1 - Ti) - _drag_force(vi) + _damping(vi)
-            a_i   = F_net / self.node_mass
-            dp_list.append(vi)
-            dv_list.append(a_i)
+        dx_teth = np.concatenate([np.ravel(dp_list), np.ravel(dv_list)])
 
-        dp_flat = np.array(dp_list).ravel()
-        dv_flat = np.array(dv_list).ravel()
-        dx_teth = np.concatenate([dp_flat, dv_flat])
-
-        # Tension on ROV => from segment n
-        p_n_1 = _get_pos(self.n - 1)
-        p_n   = _get_pos(self.n)
-        r_n_1_n = p_n - p_n_1
-        Tn = _tension(r_n_1_n)
-        return dx_teth, Tn
+        # 4) tether force on the ROV 
+        T_rovtet = T[-1]                                        # T_{n-1}
+        return dx_teth, T_rovtet
