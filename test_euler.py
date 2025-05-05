@@ -22,7 +22,7 @@ if use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 0.5, -0.5, 0.5, -0.5])
+u_thrusters = np.array([0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # 5) Simple Euler integration parameters
 dt = 0.01

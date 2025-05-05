@@ -6,7 +6,7 @@ from BlueROV2 import BlueROV2, Tether
 rov = BlueROV2()
 
 # 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5
-x0 = np.zeros(12)
+x0 = np.zeros(13)
 x0[2] = 5.0
 
 # 3) Optionally enable tether

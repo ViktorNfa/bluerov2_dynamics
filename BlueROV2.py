@@ -153,12 +153,12 @@ class BlueROV2:
         self.Mq_dot = 0.135
         self.Nr_dot = 0.222
         self.MA = np.zeros((6,6), float)
-        self.MA[0,0] = -self.Xu_dot
-        self.MA[1,1] = -self.Yv_dot
-        self.MA[2,2] = -self.Zw_dot
-        self.MA[3,3] = -self.Kp_dot
-        self.MA[4,4] = -self.Mq_dot
-        self.MA[5,5] = -self.Nr_dot
+        self.MA[0,0] = self.Xu_dot
+        self.MA[1,1] = self.Yv_dot
+        self.MA[2,2] = self.Zw_dot
+        self.MA[3,3] = self.Kp_dot
+        self.MA[4,4] = self.Mq_dot
+        self.MA[5,5] = self.Nr_dot
 
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
@@ -333,24 +333,24 @@ class BlueROV2:
 
         CA = np.zeros((6,6), float)
         # Hydrodynamics part
-        CA[0,4] = -Zwdot*w
-        CA[0,5] =  Yvdot*v
-        CA[1,3] =  Zwdot*w
-        CA[1,5] = -Xudot*u
-        CA[2,3] = -Yvdot*v
-        CA[2,4] =  Xudot*u
-        CA[3,1] = -Zwdot*w
-        CA[3,2] =  Yvdot*v
-        CA[3,4] = -Nrdot*r
-        CA[3,5] =  Mqdot*q
-        CA[4,0] =  Zwdot*w
-        CA[4,2] = -Xudot*u
-        CA[4,3] =  Nrdot*r
-        CA[4,5] = -Kpdot*p
-        CA[5,0] = -Yvdot*v
-        CA[5,1] =  Xudot*u
-        CA[5,3] = -Mqdot*q
-        CA[5,4] =  Kpdot*p
+        CA[0,4] =  Zwdot*w
+        CA[0,5] = -Yvdot*v
+        CA[1,3] = -Zwdot*w
+        CA[1,5] =  Xudot*u
+        CA[2,3] =  Yvdot*v
+        CA[2,4] = -Xudot*u
+        CA[3,1] =  Zwdot*w
+        CA[3,2] = -Yvdot*v
+        CA[3,4] =  Nrdot*r
+        CA[3,5] = -Mqdot*q
+        CA[4,0] = -Zwdot*w
+        CA[4,2] =  Xudot*u
+        CA[4,3] = -Nrdot*r
+        CA[4,5] =  Kpdot*p
+        CA[5,0] =  Yvdot*v
+        CA[5,1] = -Xudot*u
+        CA[5,3] =  Mqdot*q
+        CA[5,4] = -Kpdot*p
 
         return CRB + CA
 
@@ -358,12 +358,12 @@ class BlueROV2:
         u_r, v_r, w_r, p_r, q_r, r_r = nu_r
         # Damping matrix
         D = np.zeros((6,6), float)
-        D[0,0] = -self.Xu - self.Xu_abs*abs(u_r)
-        D[1,1] = -self.Yv - self.Yv_abs*abs(v_r)
-        D[2,2] = -self.Zw - self.Zw_abs*abs(w_r)
-        D[3,3] = -self.Kp - self.Kp_abs*abs(p_r)
-        D[4,4] = -self.Mq - self.Mq_abs*abs(q_r)
-        D[5,5] = -self.Nr - self.Nr_abs*abs(r_r)
+        D[0,0] = self.Xu + self.Xu_abs*abs(u_r)
+        D[1,1] = self.Yv + self.Yv_abs*abs(v_r)
+        D[2,2] = self.Zw + self.Zw_abs*abs(w_r)
+        D[3,3] = self.Kp + self.Kp_abs*abs(p_r)
+        D[4,4] = self.Mq + self.Mq_abs*abs(q_r)
+        D[5,5] = self.Nr + self.Nr_abs*abs(r_r)
         return D
 
     def _restoring(self, phi, theta, psi):
