@@ -1,16 +1,15 @@
 import numpy as np
-from BlueROV2 import BlueROV2, Tether, quat_from_euler, euler_from_quat
+from BlueROV2 import BlueROV2, Tether
 
 # 1) Create ROV
 rov = BlueROV2()
 
 # 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5 in navigation (n) frame
-x = np.zeros(13)
+x = np.zeros(12)
 x[2] = 5.0
-x[3:7] = quat_from_euler(0,0,0)  # level attitude
 
 # 3) Optionally enable tether
-use_tether = False
+use_tether = True
 if use_tether:
     rov.use_tether = True
     rov.tether = Tether(n_segments=5, length=20.0)
@@ -22,7 +21,7 @@ if use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+u_thrusters = np.array([0.1, 0.1, 0.1, 0.0, 0.5, 0.5, 0.5, 0.5])
 
 # 5) Simple Euler integration parameters
 dt = 0.01
@@ -35,11 +34,10 @@ print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
 xdot = np.zeros(12)  # Initialize state derivative
 for step in range(n_steps):
     # 6a) Get state derivative
-    xdot = rov.dynamics(x, u_thrusters, dt, xdot[0:3])
+    xdot = rov.dynamics(x, u_thrusters, dt)
     # 6b) Euler update
     x += dt * xdot
 
     # 6c) Print 
     t = step*dt
-    euler = euler_from_quat(x[3:7])  # Convert quaternion to euler angles in degrees
-    print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {euler[0]:.2f}, {euler[1]:.2f}, {euler[2]:.2f})")
+    print(f"Time={t:.2f}, pos=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}, {x[3]:.2f}, {x[4]:.2f}, {x[5]:.2f})")

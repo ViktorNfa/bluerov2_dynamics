@@ -6,7 +6,7 @@ from BlueROV2 import BlueROV2, Tether
 rov = BlueROV2()
 
 # 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5
-x0 = np.zeros(13)
+x0 = np.zeros(12)
 x0[2] = 5.0
 
 # 3) Optionally enable tether
@@ -22,7 +22,7 @@ if use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+u_thrusters = np.array([0.1, 0.1, 0.1, 0.0, 0.5, 0.5, 0.5, 0.5])
 
 # 5) Solve
 def ode_func(t, x):
@@ -47,5 +47,5 @@ if not sol.success:
     print("Integration failed:", sol.message)
 
 for i, t in enumerate(sol.t):
-    x_, y_, z_ = sol.y[0,i], sol.y[1,i], sol.y[2,i]
-    print(f"Time={t:.2f}, pos=({x_:.2f}, {y_:.2f}, {z_:.2f})")
+    x_, y_, z_, phi_, theta_, psi_ = sol.y[0,i], sol.y[1,i], sol.y[2,i], sol.y[3,i], sol.y[4,i], sol.y[5,i]
+    print(f"Time={t:.2f}, pos=({x_:.2f}, {y_:.2f}, {z_:.2f}, {phi_:.2f}, {theta_:.2f}, {psi_:.2f})")

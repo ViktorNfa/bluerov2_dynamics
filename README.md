@@ -9,13 +9,6 @@ This repository provides a Python-based BlueROV2 (heavy configuration) dynamics 
 
 ---
 
-## To-Do
-- [ ] Fix drag force for tether
-- [ ] Fix damping force for tether
-- [ ] Check overall tether evolution
-- [ ] Change euler angles for quaternions
-- [ ] Add thruster dynamics
-
 ## Files
 
 1. **BlueROV2.py**  
