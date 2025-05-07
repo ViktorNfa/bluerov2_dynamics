@@ -1,5 +1,5 @@
 import numpy as np
-from BlueROV2 import BlueROV2, Tether
+from BlueROV2 import BlueROV2
 
 # 1) Create ROV
 rov = BlueROV2()
@@ -8,17 +8,8 @@ rov = BlueROV2()
 x = np.zeros(12)
 x[2] = 5.0
 
-# 3) Optionally enable tether
-use_tether = True
-if use_tether:
-    rov.use_tether = True
-    rov.tether = Tether(n_segments=5, length=20.0)
-    rov.anchor_pos = np.array([0.0, 0.0, 0.0])  # anchor in NED
-    rov_start_ned = x[0:3]  # ROV start in NED
-
-    # Initialize tether nodes along a straight line, zero velocity
-    x_teth_init = rov.tether.init_nodes_line(rov.anchor_pos, rov_start_ned)
-    rov.tether_state = x_teth_init
+# 3) Tether calculation does not work in Euler integration, so disable it for now (default)
+# rov.use_tether = False
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
 u_thrusters = np.array([0.1, 0.1, 0.1, 0.0, 0.5, 0.5, 0.5, 0.5])
@@ -28,13 +19,13 @@ dt = 0.01
 t_end = 5.0
 n_steps = int(t_end / dt)
 
-print(f"Starting Euler integration for t=[0..{t_end}] at dt={dt}")
+print(f"Starting Euler integration for t=[0...{t_end}] at dt={dt}")
 
 # 6) Euler Integration Loop
 xdot = np.zeros(12)  # Initialize state derivative
 for step in range(n_steps):
     # 6a) Get state derivative
-    xdot = rov.dynamics(x, u_thrusters, dt)
+    xdot = rov.dynamics(x, u_thrusters)
     # 6b) Euler update
     x += dt * xdot
 

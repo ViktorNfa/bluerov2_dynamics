@@ -330,24 +330,23 @@ class BlueROV2:
         gvec[5] =  (self.xb*self.B)*cth*sphi + (self.yb*self.B)*sth
         return gvec
 
-    def dynamics(self, x, u_thrust, dt=0.01):
+    def dynamics(self, x, u_thrust):
         """
         Main 6-DOF (with velocities) ODE step:
           x = [eta, nu] = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
         u_thrust in R^8 => normalized (voltage) thruster commands in [-1,1].
-        dt is included so we can also integrate tether if needed.
 
         Returns xdot of the same dimension (12,).
         """
         # 1) unpack
         eta = x[0:6]
-        nu  = x[6:12]
+        nu = x[6:12]
         phi, theta, psi = eta[3:6]
 
         # 2) transforms
         R_b2n = rotation_matrix(phi, theta, psi) # Also called J1 in the paper
         R_n2b = R_b2n.T
-        J2    = euler_kinematics_matrix(phi, theta)
+        J2 = euler_kinematics_matrix(phi, theta)
 
         # 3) relative velocity
         v_c_b = R_n2b.dot(self.current_speed)
@@ -361,39 +360,77 @@ class BlueROV2:
 
         # 5) thrusters
         tau_thr = self.compute_thruster_forces(u_thrust)
-        tau_ext = np.copy(tau_thr)  # we can add tether or anything else to this
+        tau_ext = np.copy(tau_thr)  # we can add anything else to this
 
-        # 6) Tether logic (optional)
-        if self.use_tether and (self.tether is not None) and (self.tether_state is not None):
-            # The ROV attachment is at x,y,z from "eta[:3]"
-            rov_pos_ned = eta[0:3]
-            rov_vel_ned = rotation_matrix(phi, theta, psi) @ nu[:3]
-            dx_t, F_teth_ned = self.tether.dynamics(
-                self.tether_state,
-                self.anchor_pos,
-                rov_pos_ned,
-                rov_vel_ned,
-                self.current_speed
-            )
-            self.tether_state += dt * dx_t
-            # Convert that force to body frame and add
-            F_teth_b = R_n2b.dot(F_teth_ned)
-            # We assume the tether attaches to CG so we just add force in body; 
-            # If tether attaches off-CG, you'd also add a moment = cross(r_attach, F_teth_b).
-            tau_ext[0:3] += F_teth_b
-
-        # 7) solve for nu_dot
-        rhs = tau_ext - C.dot(nu_r) - D.dot(nu_r) - gvec
+        # 6) solve for nu_dot
+        rhs = tau_ext - C.dot(nu) - D.dot(nu_r) - gvec
         nu_dot = self.Minv.dot(rhs)
 
-        # 8) compute eta_dot
+        # 7) compute eta_dot
         p_dot_n = R_b2n.dot(nu[0:3])  # linear velocity in n-frame
         eul_rates = J2.dot(nu[3:6])   # orientation rates in n-frame
         eta_dot = np.concatenate([p_dot_n, eul_rates])
 
-        # 9) pack
+        # 8) pack
         x_dot = np.concatenate([eta_dot, nu_dot])
         return x_dot
+    
+    def _n_tether_states(self):
+        return 0 if (self.tether is None or self.tether.n < 2) else (self.tether.n - 1) * 6
+    
+    def dynamics_with_tether(self, x, u_thrust):
+        """
+        x  = [eta, nu, tether_internal(6*(n-1))]
+        u_thrust as before.
+        Requires:  self.use_tether is True and self.tether is set.
+        """
+        nt = self._n_tether_states()
+        assert self.use_tether and nt > 0, "tether not initialised"
+
+        # 1) split the extended state vector
+        x_body = x[:12]
+        x_teth = x[12:] # (n-1)*6 <- internal nodes
+        eta = x_body[:6]
+        nu = x_body[6:]
+        phi,theta,psi = eta[3:6]
+
+        # 2) transforms
+        R_b2n = rotation_matrix(phi, theta, psi) # Also called J1 in the paper
+        R_n2b = R_b2n.T
+        J2 = euler_kinematics_matrix(phi, theta)
+
+        # 3) relative velocity
+        v_c_b = R_n2b.dot(self.current_speed)
+        nu_r = np.copy(nu)
+        nu_r[:3] -= v_c_b
+
+        # 4) system matrices
+        C = self._coriolis(nu)
+        D = self._damping(nu_r)
+        gvec = self._restoring(phi, theta, psi)
+
+        # 5) thrusters
+        tau_thr = self.compute_thruster_forces(u_thrust)
+        tau_ext = np.copy(tau_thr)
+
+        # 6) Tether logic
+        rov_pos_ned = eta[:3]
+        rov_vel_ned = R_b2n.dot(nu[:3])
+        dx_teth, F_teth_ned = self.tether.dynamics(
+            x_teth, self.anchor_pos,
+            rov_pos_ned, rov_vel_ned,
+            self.current_speed
+        )
+
+        tau_ext[:3] += R_n2b.dot(F_teth_ned) # add force in body frame
+
+        # 7) solve for nu_dot and eta_dot
+        rhs = tau_ext - C.dot(nu) - D.dot(nu_r) - gvec
+        nu_dot = self.Minv.dot(rhs)
+        eta_dot = np.concatenate([R_b2n.dot(nu[:3]), J2.dot(nu[3:])])
+
+        # 8) pack & return 
+        return np.concatenate([eta_dot, nu_dot, dx_teth])
 
 
 ###############################################################################
@@ -509,7 +546,8 @@ class Tether:
                 T_min = 0.0 # N  
                 # Upper limit to prevent state explosion in euler integration
                 T_max = 10000.0 # N
-                T_k = np.clip(T_nominal, T_min, T_max)
+                # T_k = np.clip(T_nominal, T_min, T_max)
+                T_k = T_nominal
             else:
                 T_k = np.zeros(3)
             T.append(T_k)
