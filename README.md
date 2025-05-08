@@ -20,10 +20,10 @@ This repository provides a Python-based BlueROV2 (heavy configuration) dynamics 
      rov.tether_state = <initial array>  
      rov.anchor_pos = [x0, y0, z0]
      ```
-   - On each call to `rov.dynamics(...)`, tension forces are added in body-frame.
+   - And call to `rov.dynamics_with_tether(...)`, tension forces are added in body-frame.
 
 2. **test_euler.py**  
-   Demonstrates **simple forward-Euler** integration of the ROV (and tether if enabled). This prints results at each step in real time.
+   Demonstrates **simple forward-Euler** integration of the ROV. This prints results at each step in real time.
 
 3. **test_ode.py**  
    Demonstrates **implicit integration** using `scipy.integrate.solve_ivp(method="BDF")`. This is more stable for stiff tether dynamics. Prints results at each sampled time.

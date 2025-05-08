@@ -1,8 +1,9 @@
 import numpy as np
-from BlueROV2 import BlueROV2
+from BlueROV2_thruster_dyn import BlueROV2
 
 # 1) Create ROV
-rov = BlueROV2()
+dt = 0.01
+rov = BlueROV2(dt=dt)
 
 # 2) ROV’s initial state [eta(6), nu(6)], e.g. also put the ROV at z=5 in navigation (n) frame
 x = np.zeros(12)
@@ -15,7 +16,6 @@ x[2] = 5.0
 u_thrusters = np.array([0.1, 0.1, 0.1, 0.0, 0.5, 0.5, 0.5, 0.5])
 
 # 5) Simple Euler integration parameters
-dt = 0.01
 t_end = 5.0
 n_steps = int(t_end / dt)
 
@@ -25,7 +25,7 @@ print(f"Starting Euler integration for t=[0...{t_end}] at dt={dt}")
 xdot = np.zeros(12)  # Initialize state derivative
 for step in range(n_steps):
     # 6a) Get state derivative
-    xdot = rov.dynamics(x, u_thrusters)
+    xdot = rov.dynamics(x, u_thrusters, dt)
     # 6b) Euler update
     x += dt * xdot
 

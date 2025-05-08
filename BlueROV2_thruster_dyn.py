@@ -9,13 +9,15 @@ BlueROV2.py:
         J. Mar. Sci. Eng. 2022, 10, 1898. https://doi.org/10.3390/jmse10121898
       - T.I. Fossen. "Handbook of Marine Craft Hydrodynamics and Motion Control", 2nd ed. Wiley, 2021.
 
-    This version adds an optional tether model that can be turned on/off. See Tether class below.
+    This version adds a ThrusterLag implementation which includes accurate thruster dynamics following the main paper.
+    This version also adds an optional tether model that can be turned on/off. See Tether class below.
 
 Author: Victor Nan Fernandez-Ayala
 Date:   2025
 """
 
 import numpy as np
+from scipy.signal import cont2discrete
 
 
 def rotation_matrix(phi, theta, psi):
@@ -48,8 +50,8 @@ def euler_kinematics_matrix(phi, theta, eps=1e-7):
     cth  = np.cos(theta)
 
     # Clamp cosine before using it
-    if abs(cth) < 1e-7:
-        cth = 1e-7*np.sign(cth)
+    if abs(cth) < eps:
+        cth = eps*np.sign(cth)
         
     tth  = sth / cth
 
@@ -74,7 +76,7 @@ class BlueROV2:
     a tension force is added in body-frame.
     """
 
-    def __init__(self, rho=1000.0, current_speed=np.array([0.0, 0.0, 0.0])):
+    def __init__(self, rho=1000.0, current_speed=np.array([0.0, 0.0, 0.0]), dt=0.01):
         # Physical parameters from the paper's Table A1 (heavy config).
         self.rho = rho
         self.g = 9.82
@@ -147,10 +149,13 @@ class BlueROV2:
         # ---------------------------------------------------------------------
         # Tether fields (default off).
         self.use_tether    = False
-        self.tether        = None           # a Tether object
-        self.tether_state  = None           # shape (n-1)*6
-        self.anchor_pos    = np.zeros(3)    # top side anchor in NED
+        self.tether        = None # a Tether object
+        self.tether_state  = None # shape (n-1)*6
+        self.anchor_pos    = np.zeros(3) # top side anchor in NED
         # ---------------------------------------------------------------------
+
+        # Set state space system for thruster dynamics
+        self.thruster_lags = [ThrusterLag() for _ in range(self.n_thrusters)]
 
     def _thruster_rotational_matrix(self, alpha):
         """
@@ -227,7 +232,7 @@ class BlueROV2:
         })
         return thruster_list
 
-    def _thruster_force_from_input(self, V):
+    def _old_thruster_force_from_input(self, V):
         """
         Polynomial from the paper for T200 thrusters.
         Note that the input is the voltage V and it's normalized to [-1,1].
@@ -237,14 +242,31 @@ class BlueROV2:
         V7 = V**7
         V9 = V**9
         return -140.3*V9 + 389.9*V7 - 404.1*V5 + 176.0*V3 + 8.9*V
+    
+    def _thruster_force_from_input(self, V, i, dt):
+        """
+        1) Static polynomial V -> F_cmd
+        2) 3rd-order motor/prop lag F_cmd -> F_dyn (state x_thr[i])
+        """
+        # 1) static thrust curve (eq. 18)
+        V3 = V**3
+        V5 = V**5
+        V7 = V**7
+        V9 = V**9
 
-    def compute_thruster_forces(self, u_thrust):
+        # 2) dynamic lag
+        F_static = (-140.3*V9 + 389.9*V7 - 404.1*V5 + 176.0*V3 + 8.9*V)
+        F_dyn = self.thruster_lags[i].step(F_static, dt)
+
+        return float(F_dyn) # 1-element array -> scalar
+
+    def compute_thruster_forces(self, u_thrust, dt):
         """
         The input is voltage per thruster normalized to [-1,1].
         """
         tau = np.zeros(6, dtype=float)
         for i in range(self.n_thrusters):
-            F_i = self._thruster_force_from_input(u_thrust[i])
+            F_i = self._thruster_force_from_input(u_thrust[i], i, dt)
             dvec = self.thrusters_r[i]['dir']
             rvec = self.thrusters_r[i]['r']
             f_xyz = F_i * dvec
@@ -330,7 +352,7 @@ class BlueROV2:
         gvec[5] =  (self.xb*self.B)*cth*sphi + (self.yb*self.B)*sth
         return gvec
 
-    def dynamics(self, x, u_thrust):
+    def dynamics(self, x, u_thrust, dt):
         """
         Main 6-DOF (with velocities) ODE step:
           x = [eta, nu] = [x, y, z, phi, theta, psi,  u, v, w, p, q, r]
@@ -359,7 +381,7 @@ class BlueROV2:
         gvec = self._restoring(phi, theta, psi)
 
         # 5) thrusters
-        tau_thr = self.compute_thruster_forces(u_thrust)
+        tau_thr = self.compute_thruster_forces(u_thrust, dt)
         tau_ext = np.copy(tau_thr)  # we can add anything else to this
 
         # 6) solve for nu_dot
@@ -378,7 +400,7 @@ class BlueROV2:
     def _n_tether_states(self):
         return 0 if (self.tether is None or self.tether.n < 2) else (self.tether.n - 1) * 6
     
-    def dynamics_with_tether(self, x, u_thrust):
+    def dynamics_with_tether(self, x, u_thrust, dt):
         """
         x  = [eta, nu, tether_internal(6*(n-1))]
         u_thrust as before.
@@ -410,7 +432,7 @@ class BlueROV2:
         gvec = self._restoring(phi, theta, psi)
 
         # 5) thrusters
-        tau_thr = self.compute_thruster_forces(u_thrust)
+        tau_thr = self.compute_thruster_forces(u_thrust, dt)
         tau_ext = np.copy(tau_thr)
 
         # 6) Tether logic
@@ -432,6 +454,59 @@ class BlueROV2:
         # 8) pack & return 
         return np.concatenate([eta_dot, nu_dot, dx_teth])
 
+
+###############################################################################
+# ThrusterLag which computes the thruster dynamics (optional)
+###############################################################################
+
+class ThrusterLag:
+    """
+    Third-order unity-gain transfer function
+
+                6136 s + 108700
+    K(s) = --------------------------
+          s³ + 89 s² + 9258 s + 108700
+
+    kept in continuous form and discretised on demand.
+    """
+
+    # continuous matrices are constants
+    _Ac = np.array([[-89.0,  -72.33, -26.54],
+                    [128.0,    0.00,   0.00],
+                    [  0.0,   32.00,   0.00]])
+    _Bc = np.array([[8.0], [0.0], [0.0]])
+    _Cc = np.array([[0.0, 5.992, 3.317]])
+    _Dc = np.zeros((1, 1))
+
+    def __init__(self):
+        self._dt    = None # sampling time cached
+        self._Ad    = None # discrete matrices
+        self._Bd    = None
+        self._x     = np.zeros(3) # internal state
+
+    @staticmethod
+    def _discretise(A, B, C, D, dt):
+        """
+        Compute (Ad, Bd) for a new sampling time 'dt'.
+        """
+        Ad, Bd, _, _, _ = cont2discrete(
+            (A, B, C, D), dt, method='zoh')
+        return Ad, Bd
+
+    def _prepare(self, dt):
+        if self._dt != dt:
+            self._Ad, self._Bd = self._discretise(self._Ac, self._Bc, self._Cc, self._Dc, dt)
+            self._dt = dt # remember
+
+    def step(self, u, dt):
+        """
+        Advance one sample with input 'u' (desired static thrust),
+        returns dynamic thrust F_dyn at the same instant.
+        """
+        self._prepare(dt) # lazy discretisation
+        self._x = self._Ad @ self._x + (self._Bd[:, 0] * u)
+        return float(self._Cc @ self._x) # D term is zero
+    
 
 ###############################################################################
 # Tether class with a simple lumped-mass solver (optional)
