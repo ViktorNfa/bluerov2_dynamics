@@ -11,7 +11,7 @@ x0 = np.zeros(12)
 x0[2] = 5.0
 
 # 3) Optionally enable tether
-rov.use_tether = True
+rov.use_tether = False
 if rov.use_tether:
     rov.tether = Tether(n_segments=3, length=20.0)
     rov.anchor_pos = np.array([0.0, 0.0, 0.0])  # anchor in NED
@@ -22,25 +22,28 @@ if rov.use_tether:
     rov.tether_state = x_teth_init
 
 # 4) Some thruster command (the input is voltage normalized to [-1,1])
-u_thrusters = np.array([0.0, 0.0, 0.0, 0.0, -0.5, -0.5, -0.5, -0.5])
+u_thrusters = np.array([0.1, 0.1, 0.1, 0.0, 0.5, 0.5, 0.5, 0.5])
 
 # 5) Solve
+dt = 0.01
+t_end = 5.0
+t_eval = np.arange(0, t_end, dt)
+
 if rov.use_tether: # integrate the large system
     nt = rov._n_tether_states()
     x0_full = np.concatenate([x0, rov.tether_state])
-    f = lambda t, X: rov.dynamics_with_tether(X, u_thrusters)
+    f = lambda t, X: rov.dynamics_with_tether(X, u_thrusters, dt)
 else: # classic 12-state model
     x0_full = x0
-    f = lambda t, X: rov.dynamics(X, u_thrusters)
+    f = lambda t, X: rov.dynamics(X, u_thrusters, dt)
 
-t_end = 5.0
-
-print(f"Starting ODE integration for t=[0...{t_end}]")
+print(f"Starting ODE integration for t=[0...{t_end}] at dt={0.01}")
 
 sol = solve_ivp(
     fun=f,
     t_span=(0,t_end),
     y0=x0_full,
+    t_eval=t_eval,
     method='BDF', 
     rtol=3e-6, atol=1e-7
 )

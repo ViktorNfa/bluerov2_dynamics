@@ -1,5 +1,5 @@
 import numpy as np
-from BlueROV2_thruster_dyn import BlueROV2
+from BlueROV2 import BlueROV2
 
 # 1) Create ROV
 dt = 0.01
