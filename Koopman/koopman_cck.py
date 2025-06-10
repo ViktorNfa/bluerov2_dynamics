@@ -98,10 +98,15 @@ class KoopmanCCK:
         p_rows = np.array(self.pt_indices, dtype=int)
         self.B_[p_rows, :] = B_hat[p_rows, :]
 
-        # print(self.A_)
-        # print(self.B_)
-
         self.lift_dim_ = d
+        
+        # 5) Learn a decoder to reconstruct x
+        Z_full = np.stack([self._lift(x) for x in X])
+        W = np.linalg.solve(
+                Z_full.T @ Z_full + self.ridge * np.eye(Z_full.shape[1]),
+                Z_full.T @ X
+            )                                                   # (d, n)
+        self.decoder_ = W.T                                     # (n, d)
 
     def evaluate(self, X: np.ndarray, U: np.ndarray) -> float:
         """
@@ -141,16 +146,17 @@ class KoopmanCCK:
         p = x[self.pt_indices] if self.pt_indices else np.empty(0)
         rbf_vals = np.array([_rbf(x, c, self.gamma) for c in self.centers_])
         return np.hstack([p, rbf_vals])
-
-    def _lift_inverse(self, z: np.ndarray) -> np.ndarray:
+    
+    def _lift_inverse(self, z):
         """
-        Simple inverse that copies back original state coordinates and
-        *ignores* the RBF part (coarse but adequate for evaluation).
-
-        Better reconstructions could learn a decoder network.
+        If we have a decoder network, use it to reconstruct the state.
+        Otherwise, use a simple inverse that copies back original state coordinates
         """
-        x_rec = np.zeros(self.state_dim)
-        if self.pt_indices:
-            x_rec[self.pt_indices] = z[:len(self.pt_indices)]
-        # the remaining coordinates are unknown – leave zeros
-        return x_rec
+        if hasattr(self, "decoder_"):
+            return z @ self.decoder_.T
+        else:                               # fallback
+            x_rec = np.zeros(self.state_dim)
+            if self.pt_indices:
+                x_rec[self.pt_indices] = z[:len(self.pt_indices)]
+                # the remaining coordinates are unknown – leave zeros
+            return x_rec
