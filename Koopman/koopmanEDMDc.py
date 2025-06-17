@@ -6,12 +6,12 @@ Main class: KoopmanEDMDc
 Methods
     ├─ fit(X, U)              learn A, B from trajectory data
     ├─ evaluate(X, U)         one-step RMSE over a test set
-    ├─ simulate(x0, U_seq)    multi-step prediction (open-loop)
-    └─ save / load            (optional) persistence helpers
+    ├─ multistep_rmse(X, U, H) multi-step RMSE after H steps
+    └─ simulate(x0, U_seq)    multi-step prediction (open-loop)
 
 Key hyper-parameters
-    • n_rbfs        - number of RBF dictionary elements (≥ 1)
-    • gamma         - RBF width (1/(2*sigma²)); smaller ⇒ wider bumps
+    - n_rbfs        - number of RBF dictionary elements (>= 1)
+    - gamma         - RBF width (1/(2*sigma^2)); smaller -> wider bumps
 --------------------------------------------------------------
 
 Dependencies : numpy, scipy, dataclasses, typing, scikit-learn
@@ -31,11 +31,17 @@ from sklearn.cluster import KMeans
 from typing import Sequence
 
 
+# -----------------------------------------------------------------------------#
+# Helpers
+# -----------------------------------------------------------------------------#
 def _rbf(x: np.ndarray, c: np.ndarray, gamma: float) -> float:
-    """Gaussian RBF ‖x - c‖² → R."""
+    """Gaussian RBF ||x - c||^2 -> R."""
     return np.exp(-gamma * np.linalg.norm(x - c) ** 2)
 
 
+# -----------------------------------------------------------------------------#
+#  Main class
+# -----------------------------------------------------------------------------#
 @dataclass
 class KoopmanEDMDc:
     state_dim: int                      # (n)
@@ -60,8 +66,8 @@ class KoopmanEDMDc:
 
         Parameters
         ----------
-        X : (N, n)   state at times 0 … N-1
-        U : (N, r)   input at times 0 … N-1   (aligned with X)
+        X : (N, n)   state at times 0 ... N-1
+        U : (N, r)   input at times 0 ... N-1   (aligned with X)
         """
         N, n = X.shape
         assert U.shape[0] == N and U.shape[1] == self.input_dim
@@ -75,7 +81,7 @@ class KoopmanEDMDc:
         Z_plus = np.stack([self._lift(x) for x in X[1:]])       # (N-1, d)
         U_cut = U[:-1]                                          # (N-1, r)
 
-        # 3) solve   Z⁺ = A Z + B U    via least squares
+        # 3) solve   Z+ = A Z + B U    via least squares
         G = np.hstack([Z, U_cut])                               # (N-1, d+r)
         Y = Z_plus                                              # (N-1, d)
         # ridge-regularised normal-equation
@@ -122,7 +128,7 @@ class KoopmanEDMDc:
 
         Returns
         -------
-        scalar  RMSE over all k = 0 … N-H-1
+        scalar  RMSE over all k = 0 ... N-H-1
         """
         errs = []
         N = len(X)
@@ -159,7 +165,7 @@ class KoopmanEDMDc:
     #  Private helpers
     # ----------------------------------------------------------
     def _lift(self, x: np.ndarray) -> np.ndarray:
-        """phi(x) = [x;  RBF_1(x); … ; RBF_k(x)] ∈ R^{n+k}."""
+        """phi(x) = [x;  RBF_1(x); ... ; RBF_k(x)] in R^{n+k}."""
         rbf_vals = np.array([_rbf(x, c, self.gamma) for c in self.centers_])
         return np.hstack([x, rbf_vals])
 

@@ -2,7 +2,7 @@
 End-to-end example:
   1) Simulate the BlueROV2 physics model to generate data
   2) Fit a EDMDc Koopman model with 200 RBFs
-  3) Report one-step RMSE on a held-out test set
+  3) Report one-step and multi-step RMSE on a held-out test set
   4) Show a short multi-step prediction versus ground truth
 """
 
@@ -84,7 +84,6 @@ true_traj = states[split-1: split-1+horizon+1]
 
 print("\nFirst 200 predicted vs. true body positions (m) & orientations (deg):")
 for k in range(200):
-    # print(f"t={k*dt:4.2f}s: pred=[{pred_traj[k,0]: .3f}, {pred_traj[k,1]: .3f}, {pred_traj[k,2]: .3f}, {pred_traj[k,3]: .3f}, {pred_traj[k,4]: .3f}, {pred_traj[k,5]: .3f}], true=[{true_traj[k,0]: .3f}, {true_traj[k,1]: .3f}, {true_traj[k,2]: .3f}, {true_traj[k,3]: .3f}, {true_traj[k,4]: .3f}, {true_traj[k,5]: .3f}]")
     print(
         f"t={k*dt:4.2f}s: "
         f"pred=[{pred_traj[k,0]: .3f}, {pred_traj[k,1]: .3f}, {pred_traj[k,2]: .3f}, "

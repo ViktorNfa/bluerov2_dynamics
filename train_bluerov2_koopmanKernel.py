@@ -75,10 +75,12 @@ U_seq = U_test[:horizon]
 pred_traj = model.simulate(x0, U_seq)
 true_traj = states[split - 1 : split - 1 + horizon + 1]
 
-print("\nFirst 20 predicted vs. true states (pos & yaw):")
-for k in range(20):
+print("\nFirst 200 predicted vs. true body positions (m) & orientations (deg):")
+for k in range(200):
     print(
-        f"t={k*dt:4.2f}s "
-        f"pred=[{pred_traj[k,0]: .3f}, {pred_traj[k,1]: .3f}, {pred_traj[k,2]: .3f}, {pred_traj[k,5]: .3f}] "
-        f"true=[{true_traj[k,0]: .3f}, {true_traj[k,1]: .3f}, {true_traj[k,2]: .3f}, {true_traj[k,5]: .3f}]"
+        f"t={k*dt:4.2f}s: "
+        f"pred=[{pred_traj[k,0]: .3f}, {pred_traj[k,1]: .3f}, {pred_traj[k,2]: .3f}, "
+        f"{pred_traj[k,3]: .3f}, {pred_traj[k,4]: .3f}, {pred_traj[k,5]: .3f}], "
+        f"true=[{true_traj[k,0]: .3f}, {true_traj[k,1]: .3f}, {true_traj[k,2]: .3f}, "
+        f"{true_traj[k,3]: .3f}, {true_traj[k,4]: .3f}, {true_traj[k,5]: .3f}]"
     )
