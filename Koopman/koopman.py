@@ -1,7 +1,7 @@
 """
-Control-Coherent Koopman identification with Radial Basis Functions (RBFs).
+EDMDc Koopman identification with Radial Basis Functions (RBFs).
 
-Main class: KoopmanCCK
+Main class: Koopman
 --------------------------------------------------------------
 Methods
     ├─ fit(X, U)              learn A, B from trajectory data
@@ -12,10 +12,6 @@ Methods
 Key hyper-parameters
     • n_rbfs        - number of RBF dictionary elements (≥ 1)
     • gamma         - RBF width (1/(2*sigma²)); smaller ⇒ wider bumps
-    • pt_indices    - indices of “actuator-driven” state coords p
-                        (rows allowed to receive direct control via B)
-                        For BlueROV2 a good default is the 6 body-rate states
-                        [6,7,8,9,10,11]  (u,v,w,p,q,r).
 --------------------------------------------------------------
 
 Dependencies : numpy, scipy, scikit-learn
@@ -32,10 +28,7 @@ import numpy as np
 from numpy.linalg import pinv
 from dataclasses import dataclass
 from sklearn.cluster import KMeans
-from typing import Sequence, Tuple
-
-# import sys
-# np.set_printoptions(threshold=sys.maxsize)
+from typing import Sequence
 
 
 def _rbf(x: np.ndarray, c: np.ndarray, gamma: float) -> float:
@@ -44,12 +37,11 @@ def _rbf(x: np.ndarray, c: np.ndarray, gamma: float) -> float:
 
 
 @dataclass
-class KoopmanCCK:
+class Koopman:
     state_dim: int                      # (n)
     input_dim: int                      # (r)
     n_rbfs: int = 200
     gamma: float = 1.0
-    pt_indices: Sequence[int] = tuple()
     # regularisation for pseudo-inverse (ridge) – prevents blow-up
     ridge: float = 1e-8
 
@@ -91,22 +83,17 @@ class KoopmanCCK:
         M = M.T                                                 # (d, d+r)
         d = Z.shape[1]
         self.A_ = M[:, :d]
-        B_hat = M[:, d:]                                        # unconstrained
-
-        # 4) impose CCK structure: only p-rows are allowed in B
-        self.B_ = np.zeros_like(B_hat)
-        p_rows = np.array(self.pt_indices, dtype=int)
-        self.B_[p_rows, :] = B_hat[p_rows, :]
+        self.B_ = M[:, d:]
 
         self.lift_dim_ = d
-        
-        # 5) Learn a decoder to reconstruct x
-        Z_full = np.stack([self._lift(x) for x in X])
-        W = np.linalg.solve(
-                Z_full.T @ Z_full + self.ridge * np.eye(Z_full.shape[1]),
-                Z_full.T @ X
-            )                                                   # (d, n)
-        self.decoder_ = W.T                                     # (n, d)
+
+        # # 4) Learn a decoder to reconstruct x
+        # Z_full = np.stack([self._lift(x) for x in X])
+        # W = np.linalg.solve(
+        #         Z_full.T @ Z_full + self.ridge * np.eye(Z_full.shape[1]),
+        #         Z_full.T @ X
+        #     )                                                   # (d, n)
+        # self.decoder_ = W.T                                     # (n, d)
 
     def evaluate(self, X: np.ndarray, U: np.ndarray) -> float:
         """
@@ -121,6 +108,36 @@ class KoopmanCCK:
         preds = np.asarray(preds)
         rmse = np.sqrt(np.mean((X[1:] - preds) ** 2))
         return rmse
+    
+    def multistep_rmse(self, X: np.ndarray, U: np.ndarray, H: int = 10) -> float:
+        """
+        Root-mean-square error after propagating the model H steps
+        without re-initialising.
+
+        Parameters
+        ----------
+        X : (N, n)   full state roll-out
+        U : (N, r)   aligned inputs
+        H : horizon  (default 10 steps)
+
+        Returns
+        -------
+        scalar  RMSE over all k = 0 … N-H-1
+        """
+        errs = []
+        N = len(X)
+        for k in range(N - H):
+            # start from real state x_k
+            z = self._lift(X[k])
+            # forward-propagate H times through the Koopman model
+            for t in range(H):
+                z = self.A_ @ z + self.B_ @ U[k + t]
+            # decode to physical space and compare with ground truth x_{k+H}
+            x_pred = self._lift_inverse(z)
+            errs.append(X[k + H] - x_pred)
+
+        errs = np.asarray(errs)
+        return np.sqrt(np.mean(errs ** 2))
 
     def simulate(self, x0: np.ndarray, U_seq: np.ndarray) -> np.ndarray:
         """
@@ -142,11 +159,10 @@ class KoopmanCCK:
     #  Private helpers
     # ----------------------------------------------------------
     def _lift(self, x: np.ndarray) -> np.ndarray:
-        """phi(x) = [p(x);  RBF_1(x); … ; RBF_k(x)] ∈ ℝ^{m+k}."""
-        p = x[self.pt_indices] if self.pt_indices else np.empty(0)
+        """phi(x) = [x;  RBF_1(x); … ; RBF_k(x)] ∈ R^{n+k}."""
         rbf_vals = np.array([_rbf(x, c, self.gamma) for c in self.centers_])
-        return np.hstack([p, rbf_vals])
-    
+        return np.hstack([x, rbf_vals])
+
     def _lift_inverse(self, z):
         """
         If we have a decoder network, use it to reconstruct the state.
@@ -154,9 +170,6 @@ class KoopmanCCK:
         """
         if hasattr(self, "decoder_"):
             return z @ self.decoder_.T
-        else:                               # fallback
-            x_rec = np.zeros(self.state_dim)
-            if self.pt_indices:
-                x_rec[self.pt_indices] = z[:len(self.pt_indices)]
-                # the remaining coordinates are unknown – leave zeros
+        else:  # fallback
+            x_rec = z[:self.state_dim]
             return x_rec
