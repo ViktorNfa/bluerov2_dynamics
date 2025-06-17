@@ -1,7 +1,7 @@
 """
 EDMDc Koopman identification with Radial Basis Functions (RBFs).
 
-Main class: Koopman
+Main class: KoopmanEDMDc
 --------------------------------------------------------------
 Methods
     ├─ fit(X, U)              learn A, B from trajectory data
@@ -14,7 +14,7 @@ Key hyper-parameters
     • gamma         - RBF width (1/(2*sigma²)); smaller ⇒ wider bumps
 --------------------------------------------------------------
 
-Dependencies : numpy, scipy, scikit-learn
+Dependencies : numpy, scipy, dataclasses, typing, scikit-learn
 
 Author: Victor Nan Fernandez-Ayala
 Date:   2025
@@ -37,7 +37,7 @@ def _rbf(x: np.ndarray, c: np.ndarray, gamma: float) -> float:
 
 
 @dataclass
-class Koopman:
+class KoopmanEDMDc:
     state_dim: int                      # (n)
     input_dim: int                      # (r)
     n_rbfs: int = 200

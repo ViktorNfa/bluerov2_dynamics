@@ -7,7 +7,7 @@ End-to-end example:
 """
 
 import numpy as np
-from Koopman.koopman import Koopman
+from Koopman.koopmanEDMDc import KoopmanEDMDc
 from BlueROV2 import BlueROV2
 
 
@@ -48,7 +48,7 @@ split = int(0.8 * N)
 X_train, U_train = states[:split], inputs[:split]
 X_test,  U_test  = states[split-1:], inputs[split-1:]   # -1 for causality
 
-model = Koopman(
+model = KoopmanEDMDc(
     state_dim=12,
     input_dim=8,
     n_rbfs=200,
