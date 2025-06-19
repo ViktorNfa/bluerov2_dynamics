@@ -13,7 +13,7 @@ from BlueROV2 import BlueROV2
 # ------------------------------------------------------------------#
 np.random.seed(42)
 dt = 0.05
-T_total = 1200.0
+T_total = 12000.0
 N = int(T_total / dt)
 
 rov = BlueROV2(dt=dt)
