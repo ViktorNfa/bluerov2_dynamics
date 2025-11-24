@@ -48,7 +48,7 @@ PLOT_FIG_SECONDS = 10.0       # ~10s of open-loop rollout for 2D figure
 
 # PINc config
 PINc_HIDDEN = [64, 64, 64, 64]
-PINc_EPOCHS = 1000
+PINc_EPOCHS = 200
 PINc_BATCH = 256
 PINc_LR = 3e-3
 PINc_ROLLOUT_STEPS = 10
@@ -256,7 +256,7 @@ def animate_xy_five(
 
 
 # ------------------------------------------------------------------
-#  2D static figure for LaTeX (TRUE + 4 models, x–y with depths printed)
+#  2D static figure for LaTeX (TRUE + 4 models, x-y with depths printed)
 # ------------------------------------------------------------------
 def plot_2d_trajectories_with_depth(
     true_traj: np.ndarray,
@@ -269,7 +269,7 @@ def plot_2d_trajectories_with_depth(
     save_path: str = "media/true_vs_4models_2D.png",
 ):
     """
-    2D x–y plot of first ~`seconds` of open-loop rollout for TRUE + 4 models.
+    2D x-y plot of first ~`seconds` of open-loop rollout for TRUE + 4 models.
     Depth (z) and time printed bottom-right.
     Arrows at end of each trajectory indicate direction.
     """
