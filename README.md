@@ -1,56 +1,152 @@
-# BlueROV2 Tether-Enhanced Model
+# BlueROV2 - Koopman & Fossen Dynamics
 
-This repository provides a Python-based BlueROV2 (heavy configuration) dynamics model, extended to optionally include a lumped-mass tether. The code references:
+A unified, working codebase for modeling, training, and evaluating **BlueROV2** underwater vehicle dynamics using:
 
-- von Benzon, M.; Sørensen, F.F.; Uth, E.; Jouffroy, J.; Liniger, J.; Pedersen, S.  
-  *An Open-Source Benchmark Simulator: Control of a BlueROV2 Underwater Robot.*  
-  J. Mar. Sci. Eng. 2022, 10, 1898.
-- T.I. Fossen. *Handbook of Marine Craft Hydrodynamics and Motion Control*, 2nd ed. Wiley, 2021.
+- **Data-driven Koopman models (EDMDc / kernel variants)**
+- **Physics-based models (Fossen-style BlueROV2 dynamics)**
 
----
+The repository supports both **simulation** and **tank/recorded** datasets, with scripts for training, evaluation, and generating comparison visuals.
 
-## Files
+> 📚 For background and detailed physics documentation of the BlueROV2 model, see the [README](fossen/README).
 
-1. **BlueROV2.py**  
-   Contains the core `BlueROV2` class for 6-DOF ROV dynamics, plus an optional `Tether` class for lumped-mass tether modeling.  
-   - To activate the tether:  
-     ```python
-     rov.use_tether = True
-     rov.tether = Tether(...)
-     rov.tether_state = <initial array>  
-     rov.anchor_pos = [x0, y0, z0]
-     ```
-   - And call to `rov.dynamics_with_tether(...)`, tension forces are added in body-frame.
 
-2. **test_euler.py**  
-   Demonstrates **simple forward-Euler** integration of the ROV. This prints results at each step in real time.
+## ✨ Key Features
 
-3. **test_ode.py**  
-   Demonstrates **implicit integration** using `scipy.integrate.solve_ivp(method="BDF")`. This is more stable for stiff tether dynamics. Prints results at each sampled time.
+- **Koopman EDMDc** with configurable dictionaries (e.g., RBF) and regularization
+- **Physics baseline** (Fossen-style) for apples-to-apples comparisons
+- **Evaluation tooling** for one-step and multi-step RMSE
+- **Open-loop rollouts & visualizations** (plots/animations)
+- **ROS bag → CSV helpers** for real/tank data pipelines
+- Clean package layout with **editable install** for cross-module imports
 
-Both the Euler and ODE methods should yield consistent results (though the implicit solver is typically more stable for large thrust or stiff tethers).
 
----
+## 🚀 Getting Started
 
-## Installation
+### 1) Environment
 
-1. Clone or download this repository.
-2. Install dependencies:
-    ```bash
-    pip install numpy scipy
-    ```
-3. Run:
-    ```
-    python test_euler.py
-    ```
-    or
-    ```
-    python test_ode.py
-    ```
+```bash
+# (Windows, macOS, Linux)
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
 
----
+python -m pip install --upgrade pip
+```
 
-## License
+### 2) Install
 
-This project is released under the [MIT License](LICENSE). Feel free to use, modify, and distribute.
-Contributions are welcome!
+You can use the ```pyproject.toml``` file and install it in editable mode as:
+
+```bash
+pip install -e .
+```
+
+This makes the code importable anywhere in the repo, e.g.
+
+```bash
+from Koopman.koopmanEDMDc import KoopmanEDMDc
+# and/or
+from fossen import ...
+```
+
+### 3) Dependencies
+
+```pyproject.toml``` already install all the main dependencies, but in case it fails, the core stack is light-weight:
+
+```bash
+pip install numpy scipy scikit-learn pandas matplotlib pyyaml
+```
+
+If you plan to export MP4 animations, install ```ffmpeg``` and ensure it’s on your system ```PATH```.
+
+
+## 📦 Data
+
+**Recorded datasets** are expected as CSV files (commonly exported at **20 Hz**). Typical columns:
+
+- **State (12)**: ```x, y, z, phi, theta, psi, u, v, w, p, q, r```.
+- **Inputs**: e.g., thruster commands ```u1 ... u8``` (unused inputs can be zeroed)
+- **Sampling**: constant ```dt``` (e.g., 0.05 s for 20 Hz)
+
+Helpers for converting ROS2 bag → CSV live under the ```rosbags/``` area of the repo.
+
+
+## 🧪 Workflows
+
+The repository ships with ready-to-run scripts. The exact script names may vary; look inside the ```training/``` (or similarly named) folder and pick the one that matches your use case.
+
+### A) Train on Simulation (Koopman vs. Physics)
+```bash
+python training/<your_sim_training_script>.py
+```
+
+- Simulates BlueROV2 trajectories.
+- Fits **Koopman EDMDc** (configurable dictionary/regularization).
+- Reports **one-step** and **multi-step** RMSE.
+- Optionally saves an **open-loop** comparison animation under ```media/```.
+
+### B) Train on Recorded/Tank Data
+```bash
+python training/<your_recorded_training_script>.py
+```
+
+- Loads the latest or specified CSV dataset.
+- Trains **Koopman** and compares against **Fossen** physics.
+- Reports RMSE for selected horizons (e.g., H=1, 10, 100).
+- Saves figures/animations to ```media/```.
+
+
+## 🗂️ Repository Layout (high-level)
+```graphql
+.
+├─ Koopman/          # Data-driven Koopman models (EDMDc, kernels, etc.)
+├─ fossen/           # Physics-based BlueROV2 dynamics (Fossen-style)
+├─ training/         # Training & evaluation entry points (simulation/recorded)
+├─ rosbags/          # Rosbag→CSV converters and (optionally) exported datasets
+├─ media/            # Plots/animations generated by scripts
+├─ configs/          # (Optional) YAML configs for paths/hyperparameters
+├─ pyproject.toml    # Editable install for clean cross-module imports
+├─ README.md         # You're here 👋
+└─ LICENSE
+```
+
+This layout allows clean imports from anywhere (after ```pip install -e .```).
+
+
+## 📊 Results & Artifacts
+
+- **Metrics**: printed to console (and optionally saved as CSV when enabled).
+- **Visuals**: plots/animations written to ```media/```.
+- **Reproducibility**: you can organize runs under ```experiments/YYYY-MM-DD_*``` if desired.
+
+
+## 🤝 Contributing
+
+- Keep algorithm code modular (e.g., under ```Koopman/``` or ```fossen/```).
+- Put run-specific logic in ```training/```.
+- Add small, focused unit tests where practical.
+- Use clear docstrings and type hints for new utilities.
+
+
+## 📄 License
+
+This project is released under the license specified in [LICENSE](LICENSE).
+
+Physics model background and references: https://github.com/ViktorNfa/bluerov2_dynamics.
+
+
+## 📣 Citation
+
+If this work supports your research, please cite it. Example BibTeX:
+
+```bibtex
+@software{bluerov2_koopman_fossen,
+  title        = {BlueROV2 Koopman and Fossen Dynamics},
+  author       = {Nan Fernandez-Ayala, Victor},
+  year         = {2025},
+  url          = {https://github.com/KTH-DHSG/bluerov2_koopman},
+  note         = {Version 0.1.0}
+}
+```
