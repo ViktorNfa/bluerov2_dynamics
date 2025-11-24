@@ -7,7 +7,7 @@ A unified, working codebase for modeling, training, and evaluating **BlueROV2** 
 
 The repository supports both **simulation** and **tank/recorded** datasets, with scripts for training, evaluation, and generating comparison visuals.
 
-> 📚 For background and detailed physics documentation of the BlueROV2 model, see the [README](fossen/README).
+> 📚 For background and detailed physics documentation of the BlueROV2 model, see the [README](fossen/README.md).
 
 
 ## ✨ Key Features
@@ -133,8 +133,6 @@ This layout allows clean imports from anywhere (after ```pip install -e .```).
 ## 📄 License
 
 This project is released under the license specified in [LICENSE](LICENSE).
-
-Physics model background and references: https://github.com/ViktorNfa/bluerov2_dynamics.
 
 
 ## 📣 Citation
