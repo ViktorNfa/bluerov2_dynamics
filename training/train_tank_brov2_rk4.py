@@ -35,6 +35,7 @@ from Koopman.koopmanEDMDc import KoopmanEDMDc
 from fossen.BlueROV2 import BlueROV2
 from fossen.bluerov_torch import bluerov_compute
 
+
 # ------------------------------------------------------------------
 #  Config
 # ------------------------------------------------------------------
@@ -267,29 +268,18 @@ def plot_2d_trajectories_with_depth(
     dt: float,
     seconds: float,
     save_path: str = "media/true_vs_4models_2D.png",
-    marker_step_seconds: float = 1.0,
-    marker_cmap: str = "viridis",
 ):
     """
     2D x-y plot of first ~`seconds` of open-loop rollout for TRUE + models.
     Depth (z) and time printed bottom-right.
     Arrows at end of each trajectory indicate direction.
 
-    - Lines: one constant color per model (no gradients).
-    - Markers: same time -> same marker color across all trajectories.
-    - Colorbar: shows discrete time slices for markers (each second different color).
-
     If `pinc_traj` is None, the PINc trajectory is omitted from the plot.
     """
-    from matplotlib.lines import Line2D
-    from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import BoundaryNorm
 
     Path(save_path).parent.mkdir(exist_ok=True, parents=True)
 
-    # ------------------------------------------------------------------
     # Collect available trajectories
-    # ------------------------------------------------------------------
     traj_specs = [
         (true_traj, "True",    "-"),
         (koop_traj, "Koopman", "--"),
@@ -311,15 +301,13 @@ def plot_2d_trajectories_with_depth(
         return
 
     # Slice trajectories to horizon
-    trajs  = [traj[:horizon] for traj, _, _ in traj_specs]
+    trajs = [traj[:horizon] for traj, _, _ in traj_specs]
     labels = [lbl for _, lbl, _ in traj_specs]
     styles = [sty for _, _, sty in traj_specs]
 
     fig, ax = plt.subplots(figsize=(7, 5), dpi=300)
 
-    # ------------------------------------------------------------------
-    # Plot lines with constant colors (let Matplotlib assign C0, C1, ...)
-    # ------------------------------------------------------------------
+    # Plot all available trajectories
     lines = []
     for X, lbl, sty in zip(trajs, labels, styles):
         line, = ax.plot(
@@ -330,66 +318,16 @@ def plot_2d_trajectories_with_depth(
         )
         lines.append(line)
 
-    # Use the line colors for legend + arrows
-    line_colors = [ln.get_color() for ln in lines]
-
-    # ------------------------------------------------------------------
-    # Discrete time markers (same color across all trajectories)
-    # ------------------------------------------------------------------
-    if marker_step_seconds > 0.0:
-        # Indices for marker times (approx every `marker_step_seconds`)
-        step = max(1, int(round(marker_step_seconds / max(dt, 1e-9))))
-        marker_indices = np.arange(0, horizon, step)
-        if len(marker_indices) == 0:
-            marker_indices = np.array([0])
-
-        n_markers = len(marker_indices)
-        marker_times = marker_indices * dt  # seconds
-
-        # Discrete colormap with one color per marker time slice
-        cmap = plt.get_cmap(marker_cmap, n_markers)
-        # Colors indexed by marker index: 0, 1, ..., n_markers-1
-        marker_colors = cmap(np.arange(n_markers))
-
-        # Scatter markers for each trajectory, using same time-colors
-        for X in trajs:
-            ax.scatter(
-                X[marker_indices, 0],
-                X[marker_indices, 1],
-                c=marker_colors,
-                s=18,
-                edgecolors="none",
-                zorder=4,
-            )
-
-        # Colorbar for discrete time slices
-        # Use integer indices as "positions" in the colorbar,
-        # but label with actual time in seconds.
-        boundaries = np.arange(-0.5, n_markers + 0.5, 1.0)
-        norm = BoundaryNorm(boundaries, ncolors=n_markers)
-        sm = ScalarMappable(norm=norm, cmap=cmap)
-        sm.set_array([])
-
-        cbar = fig.colorbar(sm, ax=ax, pad=0.02)
-        cbar.set_label("time [s]", fontsize=9)
-
-        # Tick at each marker index, label with rounded time
-        tick_locs = np.arange(n_markers)
-        tick_labels = [f"{t:.0f}" for t in marker_times]
-        cbar.set_ticks(tick_locs)
-        cbar.set_ticklabels(tick_labels)
-        cbar.ax.tick_params(labelsize=8)
-
-    # ------------------------------------------------------------------
     # Arrow size based on trajectory spread
-    # ------------------------------------------------------------------
     xs = np.concatenate([X[:, 0] for X in trajs])
     ys = np.concatenate([X[:, 1] for X in trajs])
     span = max(1e-6, max(xs.max() - xs.min(), ys.max() - ys.min()))
     head_len = 0.07 * span
 
-    # Arrows at the end of each trajectory (use line color)
-    for X, color in zip(trajs, line_colors):
+    colors = [ln.get_color() for ln in lines]
+
+    # Arrows at the end of each trajectory
+    for X, color in zip(trajs, colors):
         x_end, y_end = X[-1, 0], X[-1, 1]
         psi_end = X[-1, 5]
         x_head = x_end + head_len * math.cos(psi_end)
@@ -402,9 +340,7 @@ def plot_2d_trajectories_with_depth(
             arrowprops=dict(arrowstyle="->", lw=2.0, color=color),
         )
 
-    # ------------------------------------------------------------------
     # Depth + time in bottom-right corner
-    # ------------------------------------------------------------------
     T = horizon
     text_lines = [f"t ≈ {(T - 1) * dt:5.2f} s"]
     for X, lbl in zip(trajs, labels):
@@ -419,28 +355,13 @@ def plot_2d_trajectories_with_depth(
         bbox=dict(boxstyle="round", alpha=0.25),
     )
 
-    # ------------------------------------------------------------------
-    # Axes formatting
-    # ------------------------------------------------------------------
     ax.set_xlabel("x [m]", fontsize=11)
     ax.set_ylabel("y [m]", fontsize=11)
     ax.set_title(f"Open-loop rollout (~{seconds:.1f}s, top view)", fontsize=12)
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, alpha=0.3)
 
-    # Legend using the fixed line colors/styles
-    legend_handles = []
-    for color, lbl, sty in zip(line_colors, labels, styles):
-        legend_handles.append(
-            Line2D(
-                [0], [0],
-                color=color,
-                linestyle=sty,
-                linewidth=2.5,
-                label=lbl,
-            )
-        )
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=10)
+    ax.legend(loc="upper left", fontsize=10)
 
     fig.tight_layout()
     fig.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -453,17 +374,25 @@ def plot_2d_trajectories_with_depth(
 # ------------------------------------------------------------------
 def simulate_physics(x0: np.ndarray, U_seq: np.ndarray, dt: float, rov: BlueROV2):
     """
-    Explicit-Euler rollout of the BlueROV2 model using recorded inputs.
+    RK4 rollout of the BlueROV2 model using recorded inputs.
+    Assumes rov.dynamics(x, u, dt) returns x_dot (continuous-time RHS).
     Returns trajectory of shape (len(U_seq)+1, 12).
     """
     H = len(U_seq)
     traj = np.zeros((H + 1, x0.shape[0]))
-    traj[0] = x0
-    x = x0.copy()
+    traj[0] = x = x0.copy()
+
     for k in range(H):
-        dx = rov.dynamics(x, U_seq[k], dt)
-        x = x + dt * dx
+        u = U_seq[k]
+
+        k1 = rov.dynamics(x,               u, dt)
+        k2 = rov.dynamics(x + 0.5 * dt * k1, u, dt)
+        k3 = rov.dynamics(x + 0.5 * dt * k2, u, dt)
+        k4 = rov.dynamics(x + dt * k3,       u, dt)
+
+        x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         traj[k + 1] = x
+
     return traj
 
 
@@ -529,47 +458,69 @@ def estimate_di_gains(X_train: np.ndarray, U_train: np.ndarray,
     return K_lin, K_ang
 
 
+def _di_rhs(x: np.ndarray,
+            u: np.ndarray,
+            K_lin: np.ndarray,
+            K_ang: np.ndarray) -> np.ndarray:
+    """
+    Continuous-time RHS for the simple DI model:
+
+      dpos/dt = R_b2n(phi,theta,psi) @ v
+      dang/dt = w
+      dv/dt   = U @ K_lin
+      dw/dt   = U @ K_ang
+    """
+    pos = x[0:3]
+    ang = x[3:6]
+    v   = x[6:9]
+    w   = x[9:12]
+
+    a_body = u @ K_lin   # (3,)
+    alpha  = u @ K_ang   # (3,)
+
+    phi, theta, psi = ang
+    Rb2n = _euler_to_R_b2n(phi, theta, psi)
+
+    dpos = Rb2n @ v
+    dang = w
+    dv   = a_body
+    dw   = alpha
+
+    dx = np.zeros_like(x)
+    dx[0:3]   = dpos
+    dx[3:6]   = dang
+    dx[6:9]   = dv
+    dx[9:12]  = dw
+    return dx
+
+
 def simulate_double_integrator(x0: np.ndarray,
                                U_seq: np.ndarray,
                                dt: float,
                                K_lin: np.ndarray,
                                K_ang: np.ndarray):
     """
-    Discrete DI in body frame:
-      v_{k+1} = v_k + dt * (U_k @ K_lin)
-      w_{k+1} = w_k + dt * (U_k @ K_ang)
-      p_{k+1} = p_k + dt * w_k  (small-angle approx)
-      x_{k+1} = x_k + dt * (R_b2n(phi,theta,psi) @ v_k)
+    RK4 rollout of the simple DI model in body frame:
+
+      dpos/dt = R_b2n(phi,theta,psi) @ v
+      dang/dt = w
+      dv/dt   = U @ K_lin
+      dw/dt   = U @ K_ang
     """
     H = len(U_seq)
     traj = np.zeros((H + 1, x0.shape[0]))
     traj[0] = x = x0.copy()
 
     for k in range(H):
-        pos = x[0:3]
-        ang = x[3:6]
-        v = x[6:9]
-        w = x[9:12]
+        u = U_seq[k]
 
-        a_body = U_seq[k] @ K_lin   # (3,)
-        alpha  = U_seq[k] @ K_ang   # (3,)
+        k1 = _di_rhs(x,               u, K_lin, K_ang)
+        k2 = _di_rhs(x + 0.5 * dt * k1, u, K_lin, K_ang)
+        k3 = _di_rhs(x + 0.5 * dt * k2, u, K_lin, K_ang)
+        k4 = _di_rhs(x + dt * k3,       u, K_lin, K_ang)
 
-        v_next = v + dt * a_body
-        w_next = w + dt * alpha
-
-        phi, theta, psi = ang
-        Rb2n = _euler_to_R_b2n(phi, theta, psi)
-        pos_next = pos + dt * (Rb2n @ v)
-
-        ang_next = ang + dt * w     # small-angle approx
-
-        x_next = np.zeros_like(x)
-        x_next[0:3] = pos_next
-        x_next[3:6] = ang_next
-        x_next[6:9] = v_next
-        x_next[9:12] = w_next
-
-        traj[k + 1] = x = x_next
+        x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        traj[k + 1] = x
 
     return traj
 
@@ -909,8 +860,8 @@ def main():
 
     # Train/test split (here we just reuse full dataset for both)
     split = int(TRAIN_SPLIT * N)
-    X_train, U_train = X[:split], U[:split]
-    X_test,  U_test  = X[split:], U[split:]
+    X_train, U_train = X, U
+    X_test,  U_test  = X, U
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 
     Path("models").mkdir(parents=True, exist_ok=True)
@@ -970,50 +921,10 @@ def main():
     print(f"[ok] PINc ready. (fit/load time = {t_fit_pinc:.3f} s)")
 
     # ------------------------------------------------------------------
-    #  5) Metrics: endpoint H-step RMSE + timings for all 4 models
-    # ------------------------------------------------------------------
-    print("\n[metrics] Endpoint RMSE (full 12D state) with identical evaluator:")
-
-    # Koopman (use its own multistep_rmse)
-    t0 = perf_counter(); rmse_1_kgen   = modelK.multistep_rmse(X_test, U_test, H=1);   t1_koop   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_kgen  = modelK.multistep_rmse(X_test, U_test, H=10);  t10_koop  = perf_counter() - t0
-    t0 = perf_counter(); rmse_100_kgen = modelK.multistep_rmse(X_test, U_test, H=100); t100_koop = perf_counter() - t0
-
-    # Physics
-    t0 = perf_counter(); rmse_1_phys   = multistep_rmse_endpoint_physics(X_test, U_test, H=1,   dt=dt); t1_phys   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_phys  = multistep_rmse_endpoint_physics(X_test, U_test, H=10,  dt=dt); t10_phys  = perf_counter() - t0
-    t0 = perf_counter(); rmse_100_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=100, dt=dt); t100_phys = perf_counter() - t0
-
-    # Double Integrator
-    t0 = perf_counter(); rmse_1_di     = multistep_rmse_endpoint_di(X_test, U_test, H=1,   dt=dt, K_lin=K_lin, K_ang=K_ang);   t1_di   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_di    = multistep_rmse_endpoint_di(X_test, U_test, H=10,  dt=dt, K_lin=K_lin, K_ang=K_ang);  t10_di  = perf_counter() - t0
-    t0 = perf_counter(); rmse_100_di   = multistep_rmse_endpoint_di(X_test, U_test, H=100, dt=dt, K_lin=K_lin, K_ang=K_ang); t100_di = perf_counter() - t0
-
-    # PINc
-    t0 = perf_counter(); rmse_1_pinc   = multistep_rmse_endpoint_pinc(X_test, U_test, H=1,   dt=dt, model=pinc, old_model_for_map=rov_old, device=device);   t1_pinc   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_pinc  = multistep_rmse_endpoint_pinc(X_test, U_test, H=10,  dt=dt, model=pinc, old_model_for_map=rov_old, device=device);  t10_pinc  = perf_counter() - t0
-    t0 = perf_counter(); rmse_100_pinc = multistep_rmse_endpoint_pinc(X_test, U_test, H=100, dt=dt, model=pinc, old_model_for_map=rov_old, device=device); t100_pinc = perf_counter() - t0
-
-    print("  Model                 | 1-step RMSE | 10-step RMSE | 100-step RMSE")
-    print("  ----------------------|------------:|-------------:|--------------:")
-    print(f"  Koopman               | {rmse_1_kgen:11.6f} | {rmse_10_kgen:12.6f} | {rmse_100_kgen:13.6f}")
-    print(f"  Fossen (BlueROV2)     | {rmse_1_phys:11.6f} | {rmse_10_phys:12.6f} | {rmse_100_phys:13.6f}")
-    print(f"  Double Integrator     | {rmse_1_di:11.6f} | {rmse_10_di:12.6f} | {rmse_100_di:13.6f}")
-    print(f"  PINc (ResDNN)         | {rmse_1_pinc:11.6f} | {rmse_10_pinc:12.6f} | {rmse_100_pinc:13.6f}")
-
-    print("\n[timings] Computation time (seconds):")
-    print("  Phase \\ Model         |   Koopman |    Fossen |        DI |      PINc")
-    print("  ----------------------|----------:|----------:|----------:|----------:")
-    print(f"  Train/Fit             | {t_fit_koop:10.4f} | {t_fit_phys:10.4f} | {t_fit_di:10.4f} | {t_fit_pinc:10.4f}")
-    print(f"  Metrics H=1           | {t1_koop:10.4f} | {t1_phys:10.4f} | {t1_di:10.4f} | {t1_pinc:10.4f}")
-    print(f"  Metrics H=10          | {t10_koop:10.4f} | {t10_phys:10.4f} | {t10_di:10.4f} | {t10_pinc:10.4f}")
-    print(f"  Metrics H=100         | {t100_koop:10.4f} | {t100_phys:10.4f} | {t100_di:10.4f} | {t100_pinc:10.4f}")
-
-    # ------------------------------------------------------------------
     #  6) Open-loop demo for all 4 models + TRUE + rollout timings
     # ------------------------------------------------------------------
     horizon = min(OPEN_LOOP_STEPS, len(X_test) - 1)
-    start = int(0.4 * (len(X_test) - horizon))
+    start = int(0.05 * (len(X_test) - horizon))
     x0 = X_test[start]
     U_seq = U_test[start:start+horizon]
 
@@ -1022,13 +933,13 @@ def main():
     predK = modelK.simulate(x0, U_seq)
     t_roll_koop = perf_counter() - t0
 
-    # Fossen
+    # Fossen (RK4)
     rov_phys = BlueROV2(dt=dt)
     t0 = perf_counter()
     predF = simulate_physics(x0, U_seq, dt, rov_phys)
     t_roll_phys = perf_counter() - t0
 
-    # Double Integrator
+    # Double Integrator (RK4)
     t0 = perf_counter()
     predD = simulate_double_integrator(x0, U_seq, dt, K_lin, K_ang)
     t_roll_di = perf_counter() - t0
@@ -1049,52 +960,18 @@ def main():
     print(f"  PINc (ResDNN)         | {t_roll_pinc:16.6f}")
 
     # ------------------------------------------------------------------
-    #  7) Top-view animation (TRUE + 4 models)
-    # ------------------------------------------------------------------
-    animate_xy_five(
-        true_traj=true_traj,
-        koop_traj=predK,
-        fossen_traj=predF,
-        di_traj=predD,
-        pinc_traj=predP,
-        dt=dt,
-        save_path="media/csv_true_vs_4models.gif",
-        title="Recorded CSV: True vs. Koopman / Fossen / DI / PINc",
-        tail_secs=10.0,
-        speed=1.0,
-        dpi=130,
-    )
-
-    # ------------------------------------------------------------------
-    #  8) 2D static figure (~10s) for LaTeX (TRUE + 4 models)
+    #  8) 2D static figure (~10s) for LaTeX (TRUE + 3 models here)
     # ------------------------------------------------------------------
     plot_2d_trajectories_with_depth(
         true_traj=true_traj,
         koop_traj=predK,
         fossen_traj=predF,
         di_traj=predD,
-        pinc_traj=None,
+        pinc_traj=None,  # omit PINc in static figure if desired
         dt=dt,
         seconds=PLOT_FIG_SECONDS,
-        save_path="media/true_vs_4models_2D.png",
+        save_path="media/true_vs_4models_2D_rk4.png",
     )
-
-    # ------------------------------------------------------------------
-    #  9) Optional: print first 200 predicted vs true (Koopman only)
-    # ------------------------------------------------------------------
-    print("\nFirst 200 predicted vs. true body positions (m) & orientations (deg) [Koopman]:")
-    for k in range(min(200, horizon)):
-        kx, ky, kz = predK[k, 0:3]
-        tx, ty, tz = true_traj[k, 0:3]
-        Kang = np.rad2deg(predK[k, 3:6])
-        Tang = np.rad2deg(true_traj[k, 3:6])
-        print(
-            f"t={k*dt:4.2f}s: "
-            f"K pred=({kx: .3f}, {ky: .3f}, {kz: .3f}) "
-            f"ang=({Kang[0]: .2f}, {Kang[1]: .2f}, {Kang[2]: .2f}) | "
-            f"true=({tx: .3f}, {ty: .3f}, {tz: .3f}) "
-            f"ang=({Tang[0]: .2f}, {Tang[1]: .2f}, {Tang[2]: .2f})"
-        )
 
 
 if __name__ == "__main__":
