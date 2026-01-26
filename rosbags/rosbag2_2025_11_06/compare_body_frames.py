@@ -28,9 +28,9 @@ from rosbags.highlevel import AnyReader
 from rosbags.typesys import get_types_from_idl, get_types_from_msg
 
 # ----------- USER: adjust only if your topic names differ -----------
-MOCAP_ODOM = "/mocap/itrl_rov_1/odom"            # nav_msgs/msg/Odometry
-PX4_SC     = "/itrl_rov_1/fmu/out/sensor_combined"       # px4_msgs/msg/SensorCombined (gyro_rad)
-PX4_VODOM  = "/itrl_rov_1/fmu/out/vehicle_odometry"      # px4_msgs/msg/VehicleOdometry (angular_velocity)
+MOCAP_ODOM = "/mocap/itrl_rov_1/odom"                   # nav_msgs/msg/Odometry
+PX4_SC     = "/itrl_rov_1/fmu/out/sensor_combined"      # px4_msgs/msg/SensorCombined (gyro_rad)
+PX4_VODOM  = "/itrl_rov_1/fmu/out/vehicle_odometry"     # px4_msgs/msg/VehicleOdometry (angular_velocity)
 
 # Merge tolerance (seconds) for aligning streams
 ALIGN_TOL = 0.02  # 20 ms is fine at ~100 Hz
@@ -156,8 +156,8 @@ def main(bag_path: Path):
     df_mo, W_body_from_rot, df_px = read_streams(bag_path)
 
     # Two mocap candidates:
-    #  A) Assume mocap twist is already body-frame:    W_mocap_body = [wx,wy,wz]
-    #  B) Assume mocap twist is parent/world -> rotate to body:  W_body_from_rot
+    #  A) Assume mocap twist is already body-frame: W_mocap_body = [wx,wy,wz]
+    #  B) Assume mocap twist is parent/world -> rotate to body: W_body_from_rot
     W_mocap_as_is = df_mo[["wx","wy","wz"]].to_numpy()
     t_mo = df_mo["t"].to_numpy()
     t_px = df_px["t"].to_numpy()

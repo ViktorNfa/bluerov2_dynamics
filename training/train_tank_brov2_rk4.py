@@ -191,7 +191,7 @@ def animate_xy_five(
         ax.set_title(name)
 
         path, = ax.plot([], [], lw=2, alpha=0.9, color=color)
-        dot,  = ax.plot([], [], "o", ms=6, color=color)
+        dot, = ax.plot([], [], "o", ms=6, color=color)
         arrow = FancyArrowPatch((0, 0), (0, 0),
                                 arrowstyle='-|>', mutation_scale=12,
                                 lw=2, color=color, zorder=5)
@@ -385,10 +385,10 @@ def simulate_physics(x0: np.ndarray, U_seq: np.ndarray, dt: float, rov: BlueROV2
     for k in range(H):
         u = U_seq[k]
 
-        k1 = rov.dynamics(x,               u, dt)
+        k1 = rov.dynamics(x, u, dt)
         k2 = rov.dynamics(x + 0.5 * dt * k1, u, dt)
         k3 = rov.dynamics(x + 0.5 * dt * k2, u, dt)
-        k4 = rov.dynamics(x + dt * k3,       u, dt)
+        k4 = rov.dynamics(x + dt * k3, u, dt)
 
         x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         traj[k + 1] = x
@@ -449,7 +449,7 @@ def estimate_di_gains(X_train: np.ndarray, U_train: np.ndarray,
     W = X_train[:, 9:12]   # body angular rates
     dV = (V[1:] - V[:-1]) / max(dt, 1e-9)   # (N-1,3)
     dW = (W[1:] - W[:-1]) / max(dt, 1e-9)   # (N-1,3)
-    G  = U_train[:-1]                       # (N-1,8)
+    G = U_train[:-1]                        # (N-1,8)
 
     GTG = G.T @ G
     I = np.eye(GTG.shape[0])
@@ -476,7 +476,7 @@ def _di_rhs(x: np.ndarray,
     w   = x[9:12]
 
     a_body = u @ K_lin   # (3,)
-    alpha  = u @ K_ang   # (3,)
+    alpha = u @ K_ang   # (3,)
 
     phi, theta, psi = ang
     Rb2n = _euler_to_R_b2n(phi, theta, psi)
@@ -514,10 +514,10 @@ def simulate_double_integrator(x0: np.ndarray,
     for k in range(H):
         u = U_seq[k]
 
-        k1 = _di_rhs(x,               u, K_lin, K_ang)
+        k1 = _di_rhs(x, u, K_lin, K_ang)
         k2 = _di_rhs(x + 0.5 * dt * k1, u, K_lin, K_ang)
         k3 = _di_rhs(x + 0.5 * dt * k2, u, K_lin, K_ang)
-        k4 = _di_rhs(x + dt * k3,       u, K_lin, K_ang)
+        k4 = _di_rhs(x + dt * k3, u, K_lin, K_ang)
 
         x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         traj[k + 1] = x
@@ -617,7 +617,7 @@ class PINcNet(nn.Module):
     def __init__(self, hidden_sizes=(64, 64, 64, 64)):
         super().__init__()
         self.Nx, self.Nu = 9, 4
-        Nin  = self.Nx + self.Nu + 1   # +1 for dt
+        Nin = self.Nx + self.Nu + 1   # +1 for dt
         Nout = self.Nx
 
         layers = []
@@ -686,13 +686,13 @@ def make_pinc_dataset(X12: np.ndarray,
         axis=0
     )                       # (N,4)
 
-    xk  = X9[:-1]
-    uk  = U4[:-1]
+    xk = X9[:-1]
+    uk = U4[:-1]
     xk1 = X9[1:]
     dts = np.full((len(xk), 1), dt, dtype=float)
 
     z_in = np.hstack([xk, uk, dts]) # (N-1,14)
-    y    = xk1                      # (N-1,9)
+    y = xk1                         # (N-1,9)
     return z_in, y, U4
 
 

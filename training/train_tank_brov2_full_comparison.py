@@ -15,7 +15,6 @@ Outputs:
   - 2D static figure (TRUE + 4 models, x-y, with depths printed) for LaTeX
 """
 
-import os
 import math
 from pathlib import Path
 from time import perf_counter
@@ -190,7 +189,7 @@ def animate_xy_five(
         ax.set_title(name)
 
         path, = ax.plot([], [], lw=2, alpha=0.9, color=color)
-        dot,  = ax.plot([], [], "o", ms=6, color=color)
+        dot, = ax.plot([], [], "o", ms=6, color=color)
         arrow = FancyArrowPatch((0, 0), (0, 0),
                                 arrowstyle='-|>', mutation_scale=12,
                                 lw=2, color=color, zorder=5)
@@ -311,7 +310,7 @@ def plot_2d_trajectories_with_depth(
         return
 
     # Slice trajectories to horizon
-    trajs  = [traj[:horizon] for traj, _, _ in traj_specs]
+    trajs = [traj[:horizon] for traj, _, _ in traj_specs]
     labels = [lbl for _, lbl, _ in traj_specs]
     styles = [sty for _, _, sty in traj_specs]
 
@@ -552,7 +551,7 @@ def simulate_double_integrator(x0: np.ndarray,
         w = x[9:12]
 
         a_body = U_seq[k] @ K_lin   # (3,)
-        alpha  = U_seq[k] @ K_ang   # (3,)
+        alpha = U_seq[k] @ K_ang    # (3,)
 
         v_next = v + dt * a_body
         w_next = w + dt * alpha
@@ -666,7 +665,7 @@ class PINcNet(nn.Module):
     def __init__(self, hidden_sizes=(64, 64, 64, 64)):
         super().__init__()
         self.Nx, self.Nu = 9, 4
-        Nin  = self.Nx + self.Nu + 1   # +1 for dt
+        Nin = self.Nx + self.Nu + 1   # +1 for dt
         Nout = self.Nx
 
         layers = []
@@ -733,15 +732,15 @@ def make_pinc_dataset(X12: np.ndarray,
     U4 = np.stack(
         [thrusters_to_body_wrenches(u8, dt, old6) for u8 in U8],
         axis=0
-    )                        # (N,4)
+    )                       # (N,4)
 
-    xk  = X9[:-1]
-    uk  = U4[:-1]
+    xk = X9[:-1]
+    uk = U4[:-1]
     xk1 = X9[1:]
     dts = np.full((len(xk), 1), dt, dtype=float)
 
-    z_in = np.hstack([xk, uk, dts])  # (N-1,14)
-    y    = xk1                      # (N-1,9)
+    z_in = np.hstack([xk, uk, dts])     # (N-1,14)
+    y = xk1                             # (N-1,9)
     return z_in, y, U4
 
 
@@ -910,7 +909,7 @@ def main():
     # Train/test split (here we just reuse full dataset for both)
     split = int(TRAIN_SPLIT * N)
     X_train, U_train = X[:split], U[:split]
-    X_test,  U_test  = X[split:], U[split:]
+    X_test,  U_test = X[split:], U[split:]
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 
     Path("models").mkdir(parents=True, exist_ok=True)
@@ -975,23 +974,23 @@ def main():
     print("\n[metrics] Endpoint RMSE (full 12D state) with identical evaluator:")
 
     # Koopman (use its own multistep_rmse)
-    t0 = perf_counter(); rmse_1_kgen   = modelK.multistep_rmse(X_test, U_test, H=1);   t1_koop   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_kgen  = modelK.multistep_rmse(X_test, U_test, H=10);  t10_koop  = perf_counter() - t0
+    t0 = perf_counter(); rmse_1_kgen = modelK.multistep_rmse(X_test, U_test, H=1); t1_koop = perf_counter() - t0
+    t0 = perf_counter(); rmse_10_kgen = modelK.multistep_rmse(X_test, U_test, H=10); t10_koop = perf_counter() - t0
     t0 = perf_counter(); rmse_100_kgen = modelK.multistep_rmse(X_test, U_test, H=100); t100_koop = perf_counter() - t0
 
     # Physics
-    t0 = perf_counter(); rmse_1_phys   = multistep_rmse_endpoint_physics(X_test, U_test, H=1,   dt=dt); t1_phys   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_phys  = multistep_rmse_endpoint_physics(X_test, U_test, H=10,  dt=dt); t10_phys  = perf_counter() - t0
+    t0 = perf_counter(); rmse_1_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=1, dt=dt); t1_phys = perf_counter() - t0
+    t0 = perf_counter(); rmse_10_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=10, dt=dt); t10_phys = perf_counter() - t0
     t0 = perf_counter(); rmse_100_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=100, dt=dt); t100_phys = perf_counter() - t0
 
     # Double Integrator
-    t0 = perf_counter(); rmse_1_di     = multistep_rmse_endpoint_di(X_test, U_test, H=1,   dt=dt, K_lin=K_lin, K_ang=K_ang);   t1_di   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_di    = multistep_rmse_endpoint_di(X_test, U_test, H=10,  dt=dt, K_lin=K_lin, K_ang=K_ang);  t10_di  = perf_counter() - t0
-    t0 = perf_counter(); rmse_100_di   = multistep_rmse_endpoint_di(X_test, U_test, H=100, dt=dt, K_lin=K_lin, K_ang=K_ang); t100_di = perf_counter() - t0
+    t0 = perf_counter(); rmse_1_di = multistep_rmse_endpoint_di(X_test, U_test, H=1, dt=dt, K_lin=K_lin, K_ang=K_ang); t1_di = perf_counter() - t0
+    t0 = perf_counter(); rmse_10_di = multistep_rmse_endpoint_di(X_test, U_test, H=10, dt=dt, K_lin=K_lin, K_ang=K_ang); t10_di = perf_counter() - t0
+    t0 = perf_counter(); rmse_100_di = multistep_rmse_endpoint_di(X_test, U_test, H=100, dt=dt, K_lin=K_lin, K_ang=K_ang); t100_di = perf_counter() - t0
 
     # PINc
-    t0 = perf_counter(); rmse_1_pinc   = multistep_rmse_endpoint_pinc(X_test, U_test, H=1,   dt=dt, model=pinc, old_model_for_map=rov_old, device=device);   t1_pinc   = perf_counter() - t0
-    t0 = perf_counter(); rmse_10_pinc  = multistep_rmse_endpoint_pinc(X_test, U_test, H=10,  dt=dt, model=pinc, old_model_for_map=rov_old, device=device);  t10_pinc  = perf_counter() - t0
+    t0 = perf_counter(); rmse_1_pinc = multistep_rmse_endpoint_pinc(X_test, U_test, H=1, dt=dt, model=pinc, old_model_for_map=rov_old, device=device); t1_pinc = perf_counter() - t0
+    t0 = perf_counter(); rmse_10_pinc = multistep_rmse_endpoint_pinc(X_test, U_test, H=10, dt=dt, model=pinc, old_model_for_map=rov_old, device=device); t10_pinc = perf_counter() - t0
     t0 = perf_counter(); rmse_100_pinc = multistep_rmse_endpoint_pinc(X_test, U_test, H=100, dt=dt, model=pinc, old_model_for_map=rov_old, device=device); t100_pinc = perf_counter() - t0
 
     print("  Model                 | 1-step RMSE | 10-step RMSE | 100-step RMSE")

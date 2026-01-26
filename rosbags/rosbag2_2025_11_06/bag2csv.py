@@ -28,13 +28,13 @@ from rosbags.typesys import get_types_from_idl, get_types_from_msg
 BAG_PATH = Path(__file__).parent / "rosbag2_2025_11_06-manual"
 
 # Primary mocap topics
-MOCAP_ODOM = "/mocap/itrl_rov_1/odom"          # nav_msgs/msg/Odometry
-MOCAP_POSE = "/mocap/itrl_rov_1/pose"          # geometry_msgs/msg/PoseStamped
-MOCAP_VEL  = "/mocap/itrl_rov_1/velocity"      # geometry_msgs/msg/TwistStamped
+MOCAP_ODOM = "/mocap/itrl_rov_1/odom"           # nav_msgs/msg/Odometry
+MOCAP_POSE = "/mocap/itrl_rov_1/pose"           # geometry_msgs/msg/PoseStamped
+MOCAP_VEL = "/mocap/itrl_rov_1/velocity"        # geometry_msgs/msg/TwistStamped
 
 # PX4 fallbacks and actuators
-PX4_VODOM  = "/itrl_rov_1/fmu/out/vehicle_odometry"  # px4_msgs/msg/VehicleOdometry
-PX4_MOTORS = "/itrl_rov_1/fmu/out/actuator_motors"   # px4_msgs/msg/ActuatorMotors
+PX4_VODOM = "/itrl_rov_1/fmu/out/vehicle_odometry"  # px4_msgs/msg/VehicleOdometry
+PX4_MOTORS = "/itrl_rov_1/fmu/out/actuator_motors"  # px4_msgs/msg/ActuatorMotors
 
 # Optional TF topics (unused in export)
 TF_TOPIC = "/tf"
@@ -142,7 +142,7 @@ def infer_twist_frame(times, pos_world, lin_twist_msgs, quats):
     def rmse(a,b):
         return float(np.sqrt(np.mean((a-b)**2)))
     e_parent = rmse(v_fd, v_msg_world)
-    e_body   = rmse(v_fd, v_body_to_world)
+    e_body = rmse(v_fd, v_body_to_world)
     which = "parent" if e_parent <= e_body else "body"
     print(f"[i] Twist frame inference: {which} (RMSE world={e_parent:.4f}, body->world={e_body:.4f})")
     return which
@@ -363,7 +363,7 @@ def read_bag():
             print("[i] Actuator topic not present.")
 
     df_odom = pd.DataFrame([r.__dict__ for r in odom_rows]).sort_values("t").reset_index(drop=True)
-    df_act  = pd.DataFrame(motor_rows).sort_values("t").reset_index(drop=True) if motor_rows else None
+    df_act = pd.DataFrame(motor_rows).sort_values("t").reset_index(drop=True) if motor_rows else None
     return df_odom, df_act
 # ============================================================
 

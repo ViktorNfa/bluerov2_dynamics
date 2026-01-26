@@ -66,7 +66,7 @@ def animate_xy_true_vs_koopman(
 
     # Left (TRUE)
     true_path, = axL.plot([], [], lw=2, alpha=0.9)
-    true_dot,  = axL.plot([], [], "o", ms=6)
+    true_dot, = axL.plot([], [], "o", ms=6)
     true_arrow = FancyArrowPatch((0, 0), (0, 0),
                                  arrowstyle='-|>', mutation_scale=12,
                                  lw=2, color="C0", zorder=5)
@@ -75,7 +75,7 @@ def animate_xy_true_vs_koopman(
 
     # Right (KOOPMAN)
     koop_path, = axR.plot([], [], lw=2, alpha=0.9)
-    koop_dot,  = axR.plot([], [], "o", ms=6)
+    koop_dot, = axR.plot([], [], "o", ms=6)
     koop_arrow = FancyArrowPatch((0, 0), (0, 0),
                                  arrowstyle='-|>', mutation_scale=12,
                                  lw=2, color="C1", zorder=5)
@@ -186,10 +186,10 @@ for k in range(N):
 
     # add sensor-like Gaussian noise
     noisy_state = x.copy()
-    noisy_state[0:3]  += pos_noise_std     * np.random.randn(3)  # position
-    noisy_state[3:6]  += ang_noise_std     * np.random.randn(3)  # Euler angles (rad)
-    noisy_state[6:9]  += vel_noise_std     * np.random.randn(3)  # linear velocity
-    noisy_state[9:12] += angvel_noise_std  * np.random.randn(3)  # angular velocity
+    noisy_state[0:3] += pos_noise_std * np.random.randn(3)      # position
+    noisy_state[3:6] += ang_noise_std * np.random.randn(3)      # Euler angles (rad)
+    noisy_state[6:9] += vel_noise_std * np.random.randn(3)      # linear velocity
+    noisy_state[9:12] += angvel_noise_std * np.random.randn(3)  # angular velocity
 
 
     states[k] = noisy_state
@@ -201,7 +201,7 @@ for k in range(N):
 # ------------------------------------------------------------------
 split = int(0.8 * N)
 X_train, U_train = states[:split], inputs[:split]
-X_test,  U_test  = states[split-1:], inputs[split-1:]   # -1 for causality
+X_test, U_test = states[split-1:], inputs[split-1:]   # -1 for causality
 
 model = KoopmanEDMDc(
     state_dim=12,

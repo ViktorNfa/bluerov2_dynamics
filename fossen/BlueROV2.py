@@ -150,10 +150,10 @@ class BlueROV2:
 
         # ---------------------------------------------------------------------
         # Tether fields (default off).
-        self.use_tether    = False
-        self.tether        = None # a Tether object
-        self.tether_state  = None # shape (n-1)*6
-        self.anchor_pos    = np.zeros(3) # top side anchor in NED
+        self.use_tether = False
+        self.tether = None # a Tether object
+        self.tether_state = None # shape (n-1)*6
+        self.anchor_pos = np.zeros(3) # top side anchor in NED
         # ---------------------------------------------------------------------
 
     def _thruster_rotational_matrix(self, alpha):
@@ -481,10 +481,10 @@ class ThrusterLag:
     _Dc = np.zeros((1, 1))
 
     def __init__(self):
-        self._dt    = None # sampling time cached
-        self._Ad    = None # discrete matrices
-        self._Bd    = None
-        self._x     = np.zeros(3) # internal state
+        self._dt = None # sampling time cached
+        self._Ad = None # discrete matrices
+        self._Bd = None
+        self._x = np.zeros(3) # internal state
 
     @staticmethod
     def _discretise(A, B, C, D, dt):
@@ -607,14 +607,14 @@ class Tether:
         vel = [np.zeros(3), *v_int, rov_vel]
 
         # 2) pre-compute segment quantities (k = 0 … n-1)
-        T = []          # axial tension   (Eq. 36)
-        P = []          # internal damping (Eq. 29)
-        F = []          # hydrodynamic drag (Eqs. 30-34)
+        T = [] # axial tension   (Eq. 36)
+        P = [] # internal damping (Eq. 29)
+        F = [] # hydrodynamic drag (Eqs. 30-34)
 
         for k in range(self.n):
-            r_k     = pos[k + 1] - pos[k] # vector node k -> k+1
-            L_k     = np.linalg.norm(r_k) + 1e-12 # avoid /0
-            r_hat   = r_k / L_k
+            r_k = pos[k + 1] - pos[k] # vector node k -> k+1
+            L_k = np.linalg.norm(r_k) + 1e-12 # avoid /0
+            r_hat = r_k / L_k
 
             # axial tension T_k (Eq. 36)
             if L_k > self.l0: # slack → no tension
@@ -630,14 +630,14 @@ class Tether:
 
             # external drag F_k (Eqs. 31-34)
             v_rel_flow = current_ned - vel[k] # flow at node k
-            v_perp     = np.dot(v_rel_flow, r_hat) * r_hat      # Eq. 33
-            v_tan      = v_rel_flow - v_perp                    # Eq. 34
+            v_perp = np.dot(v_rel_flow, r_hat) * r_hat      # Eq. 33
+            v_tan = v_rel_flow - v_perp                     # Eq. 34
 
             sp_perp = np.linalg.norm(v_perp)
-            sp_tan  = np.linalg.norm(v_tan)
+            sp_tan = np.linalg.norm(v_tan)
 
             F_perp = 0.5 * self.rho * self.dtet * self.Cn * L_k * sp_perp * v_perp
-            F_tan  = 0.5 * self.rho * self.dtet * self.Ct * L_k * sp_tan  * v_tan
+            F_tan = 0.5 * self.rho * self.dtet * self.Ct * L_k * sp_tan * v_tan
             F.append(F_perp + F_tan)                            # Eq. 30
 
         # 3) node dynamics  (i = 1 … n-1)

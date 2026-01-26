@@ -344,7 +344,7 @@ def main():
     predK = model.simulate(x0, U_seq)           # (horizon+1, 12)
 
     # Truth
-    true_traj = X[start:end + 1]
+    true_traj = X_test[start:end + 1]
 
     Path("media").mkdir(exist_ok=True)
     animate_xy_true_vs_koopman(

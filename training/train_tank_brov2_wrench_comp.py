@@ -314,12 +314,12 @@ def simulate_double_integrator(x0: np.ndarray,
     for k in range(H):
         pos = x[0:3]
         ang = x[3:6]
-        v   = x[6:9]
-        w   = x[9:12]
+        v = x[6:9]
+        w = x[9:12]
 
         # Input (wrench) → accelerations in body frame
         a_body = U_seq[k] @ K_lin   # (3,)
-        alpha  = U_seq[k] @ K_ang   # (3,)
+        alpha = U_seq[k] @ K_ang    # (3,)
 
         # Integrate velocities
         v_next = v + dt * a_body
@@ -381,7 +381,7 @@ def main():
     # 2) Train / test split
     split = int(TRAIN_SPLIT * N)
     X_train, U_train = X[:split], U[:split]
-    X_test, U_test   = X[split-1:], U[split-1:]
+    X_test, U_test = X[split-1:], U[split-1:]
 
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 
@@ -403,17 +403,17 @@ def main():
     # ------------------------------------------------------------------
     #  3c)  Metrics: identical evaluator (endpoint H-step RMSE)
     # ------------------------------------------------------------------
-    rmse_1_kgen   = model.multistep_rmse(X_test, U_test, H=1)
-    rmse_10_kgen  = model.multistep_rmse(X_test, U_test, H=10)
+    rmse_1_kgen = model.multistep_rmse(X_test, U_test, H=1)
+    rmse_10_kgen = model.multistep_rmse(X_test, U_test, H=10)
     rmse_100_kgen = model.multistep_rmse(X_test, U_test, H=100)
 
-    rmse_1_phys   = multistep_rmse_endpoint_physics(X_test, U_test, H=1,   dt=dt)
-    rmse_10_phys  = multistep_rmse_endpoint_physics(X_test, U_test, H=10,  dt=dt)
+    rmse_1_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=1,   dt=dt)
+    rmse_10_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=10,  dt=dt)
     rmse_100_phys = multistep_rmse_endpoint_physics(X_test, U_test, H=100, dt=dt)
 
-    rmse_1_di     = multistep_rmse_endpoint_di(X_test, U_test, H=1,   dt=dt, K_lin=K_lin, K_ang=K_ang)
-    rmse_10_di    = multistep_rmse_endpoint_di(X_test, U_test, H=10,  dt=dt, K_lin=K_lin, K_ang=K_ang)
-    rmse_100_di   = multistep_rmse_endpoint_di(X_test, U_test, H=100, dt=dt, K_lin=K_lin, K_ang=K_ang)
+    rmse_1_di = multistep_rmse_endpoint_di(X_test, U_test, H=1,   dt=dt, K_lin=K_lin, K_ang=K_ang)
+    rmse_10_di = multistep_rmse_endpoint_di(X_test, U_test, H=10,  dt=dt, K_lin=K_lin, K_ang=K_ang)
+    rmse_100_di = multistep_rmse_endpoint_di(X_test, U_test, H=100, dt=dt, K_lin=K_lin, K_ang=K_ang)
 
     print("\n[metrics] Side-by-side using identical evaluator (endpoint RMSE):")
     print("  Model               | 1-step RMSE | 10-step RMSE | 100-step RMSE")
@@ -438,7 +438,7 @@ def main():
     predD = simulate_double_integrator(x0, U_seq, dt, K_lin, K_ang)
 
     # Truth
-    true_traj = X[:horizon+1]
+    true_traj = X_test[:horizon+1]
 
     Path("media").mkdir(exist_ok=True)
     animate_xy_four(
