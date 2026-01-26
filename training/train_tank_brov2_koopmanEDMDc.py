@@ -1,6 +1,6 @@
 """
 End-to-end example (recorded data):
-  1) Load the newest rosbags/**/koopman_dataset_20Hz.csv
+  1) Load the newest rosbags/**/koopman_dataset_50Hz.csv
   2) Fit an EDMDc Koopman model (RBF dictionary)
   3) Compare against the BlueROV2 physics model:
        - One-step RMSE
@@ -299,8 +299,8 @@ def main():
 
     # 2) Train / test split  (causal: start test one sample earlier)
     split = int(TRAIN_SPLIT * N)
-    X_train, U_train = X, U
-    X_test, U_test = X, U
+    X_train, U_train = X[:split], U[:split]
+    X_test, U_test = X[split-1:], U[split-1:]
 
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 

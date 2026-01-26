@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Train & compare 4 models for BlueROV2 Heavy dynamics on a recorded dataset:
+Train & compare 4 models for BlueROV2 Heavy dynamics using RK4 on a recorded dataset:
 
   1) Koopman EDMDc (12x8)
   2) Physics-based Fossen model (BlueROV2 6-DOF)
@@ -635,7 +635,7 @@ class PINcNet(nn.Module):
         """
         x_k = z[:, :9]
         """
-        dx = self.net(z)                   # (B,9)
+        dx = self.net(z)                # (B,9)
 
         # Rotate residual's x,y components body->world using current yaw
         cpsi = z[:, 3]
@@ -645,7 +645,7 @@ class PINcNet(nn.Module):
         dx_wx = cpsi * dx_bx - spsi * dx_by
         dx_wy = spsi * dx_bx + cpsi * dx_by
 
-        base = z[:, :9] + dx              # provisional next state
+        base = z[:, :9] + dx            # provisional next state
 
         # Replace x,y increments with rotated ones
         x_next_xy = torch.stack([
@@ -662,11 +662,11 @@ class PINcNet(nn.Module):
 
         x_next = torch.cat(
             [
-                x_next_xy,               # x, y
-                base[:, 2:3],            # z
-                c_hat.unsqueeze(1),      # cosψ
-                s_hat.unsqueeze(1),      # sinψ
-                base[:, 5:9],            # u, v, w, r
+                x_next_xy,              # x, y
+                base[:, 2:3],           # z
+                c_hat.unsqueeze(1),     # cosψ
+                s_hat.unsqueeze(1),     # sinψ
+                base[:, 5:9],           # u, v, w, r
             ],
             dim=1,
         )
@@ -684,14 +684,14 @@ def make_pinc_dataset(X12: np.ndarray,
     U4 = np.stack(
         [thrusters_to_body_wrenches(u8, dt, old6) for u8 in U8],
         axis=0
-    )                        # (N,4)
+    )                       # (N,4)
 
     xk  = X9[:-1]
     uk  = U4[:-1]
     xk1 = X9[1:]
     dts = np.full((len(xk), 1), dt, dtype=float)
 
-    z_in = np.hstack([xk, uk, dts])  # (N-1,14)
+    z_in = np.hstack([xk, uk, dts]) # (N-1,14)
     y    = xk1                      # (N-1,9)
     return z_in, y, U4
 
@@ -860,8 +860,8 @@ def main():
 
     # Train/test split (here we just reuse full dataset for both)
     split = int(TRAIN_SPLIT * N)
-    X_train, U_train = X, U
-    X_test,  U_test  = X, U
+    X_train, U_train = X[:split], U[:split]
+    X_test,  U_test  = X[split-1:], U[split-1:]
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 
     Path("models").mkdir(parents=True, exist_ok=True)

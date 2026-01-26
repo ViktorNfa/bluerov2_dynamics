@@ -380,8 +380,8 @@ def main():
 
     # 2) Train / test split
     split = int(TRAIN_SPLIT * N)
-    X_train, U_train = X, U
-    X_test, U_test   = X, U
+    X_train, U_train = X[:split], U[:split]
+    X_test, U_test   = X[split-1:], U[split-1:]
 
     print(f"[i] Train: {len(X_train)} | Test: {len(X_test)}")
 
