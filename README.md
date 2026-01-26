@@ -2,8 +2,9 @@
 
 A unified, working codebase for modeling, training, and evaluating **BlueROV2** underwater vehicle dynamics using:
 
-- **Data-driven Koopman models (EDMDc / kernel variants)**
+- **Data-driven Koopman models (EDMDc)**
 - **Physics-based models (Fossen-style BlueROV2 dynamics)**
+- **Some other popular alternatives (PINN)**
 
 The repository supports both **simulation** and **tank/recorded** datasets, with scripts for training, evaluation, and generating comparison visuals.
 
@@ -22,7 +23,28 @@ The repository supports both **simulation** and **tank/recorded** datasets, with
 
 ## 🚀 Getting Started
 
-### 1) Environment
+### 1) Cloning
+
+Clone the repo using HTTPS or SSH:
+```bash
+# For example, using HTTPS
+git clone https://github.com/ViktorNfa/bluerov2_dynamics.git
+```
+
+The repo uses Git LFS for the database files which are quite large, so remember to do:
+```bash
+cd bluerov2_dynamics
+git lfs pull
+```
+
+If you don't have Git LFS you might have to install it first:
+```bash
+sudo apt update
+sudo apt install -y git-lfs
+git lfs install
+```
+
+### 2) Environment
 
 ```bash
 # (Windows, macOS, Linux)
@@ -35,7 +57,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 ```
 
-### 2) Install
+### 3) Install
 
 You can use the ```pyproject.toml``` file and install it in editable mode as:
 
@@ -51,7 +73,7 @@ from Koopman.koopmanEDMDc import KoopmanEDMDc
 from fossen import ...
 ```
 
-### 3) Dependencies
+### 4) Dependencies
 
 ```pyproject.toml``` already install all the main dependencies, but in case it fails, the core stack is light-weight:
 
@@ -64,11 +86,11 @@ If you plan to export MP4 animations, install ```ffmpeg``` and ensure it’s on 
 
 ## 📦 Data
 
-**Recorded datasets** are expected as CSV files (commonly exported at **20 Hz**). Typical columns:
+**Recorded datasets** are expected as CSV files (commonly exported at **50 Hz**). Typical columns:
 
 - **State (12)**: ```x, y, z, phi, theta, psi, u, v, w, p, q, r```.
 - **Inputs**: e.g., thruster commands ```u1 ... u8``` (unused inputs can be zeroed)
-- **Sampling**: constant ```dt``` (e.g., 0.05 s for 20 Hz)
+- **Sampling**: constant ```dt``` (e.g., 0.02 s for 50 Hz)
 
 Helpers for converting ROS2 bag → CSV live under the ```rosbags/``` area of the repo.
 
@@ -143,7 +165,7 @@ If this work supports your research, please cite it. Example BibTeX:
 @software{bluerov2_koopman_fossen,
   title        = {BlueROV2 Koopman and Fossen Dynamics},
   author       = {Nan Fernandez-Ayala, Victor},
-  year         = {2025},
+  year         = {2026},
   url          = {https://github.com/KTH-DHSG/bluerov2_koopman},
   note         = {Version 0.1.0}
 }

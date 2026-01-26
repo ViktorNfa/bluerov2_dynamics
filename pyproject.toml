@@ -10,4 +10,4 @@ dependencies = ["numpy", "scipy", "scikit-learn", "pandas", "matplotlib"]
 
 [tool.setuptools]
 packages = ["Koopman", "fossen"]
-py-modules = ["BlueROV2", "BlueROV2_thrust", "BlueROV_david", "LearnedFossen"]
+py-modules = ["BlueROV2", "BlueROV2_thrust"]

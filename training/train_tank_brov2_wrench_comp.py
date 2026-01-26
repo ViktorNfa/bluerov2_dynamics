@@ -1,6 +1,6 @@
 """
 End-to-end example (wrench dataset):
-  1) Load the newest rosbags/**/koopman_wrench_dataset_50Hz.csv
+  1) Load the newest rosbags/**/koopman_dataset_50Hz_with_wrench.csv
   2) Fit an EDMDc Koopman model (RBF dictionary) with 6D wrench input
   3) Compare against:
        - BlueROV2 physics model with direct wrench input
@@ -24,7 +24,7 @@ from fossen.BlueROV2_thrust import BlueROV2
 # ------------------------------------------------------------------
 #  0)  Config
 # ------------------------------------------------------------------
-DATASET_NAME = "koopman_wrench_dataset_50Hz.csv"
+DATASET_NAME = "koopman_dataset_50Hz_with_wrench.csv"
 TRAIN_SPLIT = 0.80
 N_RBFS = 500
 GAMMA = 3.0

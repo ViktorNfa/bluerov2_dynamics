@@ -299,15 +299,53 @@ def read_bag():
         if PX4_MOTORS in conns:
             conn = conns[PX4_MOTORS]
             vals = []
+
+            # ---- NaN diagnostics (raw actuator messages) ----
+            nan_any_count = 0
+            nan_per_chan = np.zeros(8, dtype=int)
+            valid_count_hist = np.zeros(9, dtype=int)  # 0..8 valid channels
+            first_nan_examples = []  # (t, arr8)
+            total_msgs = 0
+
             for c, ts, data in reader.messages(connections=[conn]):
                 t = (ts - (t0_ns if t0_ns is not None else ts)) * 1e-9
                 m = reader.deserialize(data, c.msgtype)
                 arr = list(m.control) if hasattr(m, "control") else []
                 if not arr:
                     continue
-                vals.append((t, arr[:8]))
+                a8 = np.asarray(arr[:8], dtype=float)
+                a8 = np.nan_to_num(a8, nan=0.0)
+                vals.append((t, a8))
+
+                total_msgs += 1
+                isn = np.isnan(a8)
+                if np.any(isn):
+                    nan_any_count += 1
+                    nan_per_chan += isn.astype(int)
+                    if len(first_nan_examples) < 5:
+                        first_nan_examples.append((t, a8.copy()))
+                valid_count_hist[int(np.sum(~isn))] += 1
+
             if vals:
                 mat = np.array([a for _, a in vals], dtype=float)
+
+                # ---- NaN diagnostics report (raw actuator messages) ----
+                print("[i] Actuator messages:", total_msgs)
+                if total_msgs > 0:
+                    print(f"[i] Raw actuator msgs w/ any NaN: {nan_any_count} ({100.0*nan_any_count/total_msgs:.2f}%)")
+                    for i in range(8):
+                        print(f"[i]  NaNs in u{i+1}: {nan_per_chan[i]} ({100.0*nan_per_chan[i]/total_msgs:.2f}%)")
+                    print("[i] Valid-channel count histogram (k valid of 8):")
+                    for k in range(9):
+                        if valid_count_hist[k]:
+                            print(f"     k={k}: {valid_count_hist[k]}")
+
+                    if first_nan_examples:
+                        print("[i] First NaN examples (t, values; NaNs shown as 'nan'):")
+                        for t_ex, a_ex in first_nan_examples:
+                            nan_idx = np.where(np.isnan(a_ex))[0].tolist()
+                            print(f"     t={t_ex:.6f}s  nan_idx={nan_idx}  a={a_ex}")
+
                 amin, amax = float(np.nanmin(mat)), float(np.nanmax(mat))
                 print(f"[i] Actuator raw range: [{amin:.3f}, {amax:.3f}]")
                 # Keep original values. Only clip to [-1,1] to be safe.
@@ -365,6 +403,36 @@ def resample_and_join(df_odom: pd.DataFrame, df_act: pd.DataFrame | None) -> pd.
             on="t", direction="nearest", tolerance=tol
         )
         df = pd.concat([df_odom, merged.drop(columns=["t"])], axis=1)
+
+        # ---- NaN diagnostics (after merge, before fill) ----
+        prefill_nans = df[rc_cols].isna().sum()
+        total_cells = df[rc_cols].shape[0] * df[rc_cols].shape[1]
+        total_nan_cells = int(prefill_nans.sum())
+        print(f"[i] After merge (before fill): NaN cells in u1..u8 = {total_nan_cells}/{total_cells} ({100.0*total_nan_cells/max(1,total_cells):.2f}%)")
+        print("[i] After merge NaNs per channel:", prefill_nans.to_dict())
+
+        # Where in time are NaNs concentrated?
+        nan_any = df[rc_cols].isna().any(axis=1)
+        if nan_any.any():
+            t_nan0 = float(df.loc[nan_any, "t"].iloc[0])
+            t_nan1 = float(df.loc[nan_any, "t"].iloc[-1])
+            frac_nan_rows = 100.0 * float(nan_any.mean())
+            print(f"[i] Rows w/ any actuator NaN (pre-fill): {frac_nan_rows:.2f}%")
+            print(f"[i] First NaN row at t={t_nan0:.3f}s, last at t={t_nan1:.3f}s")
+
+        # Longest contiguous NaN run per channel (in seconds)
+        dt = float(np.median(np.diff(df["t"].to_numpy())))
+        for c in rc_cols:
+            isn = df[c].isna().to_numpy()
+            if not isn.any():
+                print(f"[i] {c}: no NaNs after merge")
+                continue
+            # run-length encoding
+            idx = np.flatnonzero(np.diff(np.r_[False, isn, False]))
+            run_lengths = (idx[1::2] - idx[0::2])
+            max_run = int(run_lengths.max()) if len(run_lengths) else 0
+            print(f"[i] {c}: max NaN run = {max_run} samples (~{max_run*dt:.3f}s)")
+
     else:
         df = df_odom.copy()
         for c in rc_cols:
