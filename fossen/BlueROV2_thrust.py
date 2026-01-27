@@ -108,7 +108,7 @@ class BlueROV2:
         self.MRB[4, 4] = self.Iy
         self.MRB[5, 5] = self.Iz
 
-        # Added mass (with minus sign as per Fossen)
+        # Added mass (paper forgets to add a minus sign for these terms)
         self.Xu_dot = -6.36
         self.Yv_dot = -7.12
         self.Zw_dot = -18.68
@@ -127,7 +127,7 @@ class BlueROV2:
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
 
-        # Damping (linear + quadratic)
+        # Damping (linear + quadratic) (paper forgets to add a minus sign for these terms)
         self.Xu = -13.7
         self.Xu_abs = -141.0
         self.Yv = -0.0
@@ -163,11 +163,11 @@ class BlueROV2:
         CRB[2, 4] = -self.m * u
         CRB[3, 1] =  self.m * w
         CRB[3, 2] = -self.m * v
-        CRB[3, 4] =  self.Iz * r
+        CRB[3, 4] =  self.Iz * r # I think this term is wrong in the paper, based on Fossen Eq. 3.60
         CRB[3, 5] = -self.Iy * q
         CRB[4, 0] = -self.m * w
         CRB[4, 2] =  self.m * u
-        CRB[4, 3] = -self.Iz * r
+        CRB[4, 3] = -self.Iz * r # I think this term is wrong in the paper, based on Fossen Eq. 3.60
         CRB[4, 5] =  self.Ix * p
         CRB[5, 0] =  self.m * v
         CRB[5, 1] = -self.m * u
