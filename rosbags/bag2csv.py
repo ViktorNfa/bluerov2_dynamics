@@ -50,7 +50,7 @@ WRITE_PARQUET = False
 
 # Video
 MAKE_VIDEO = True
-VIDEO_PATH = "media/bag_topdown.mp4"
+VIDEO_PATH = f"media/bag_topdown_{BAG_PATH.name}.mp4"
 VIDEO_SPEED = 6.0
 VIDEO_MAX_FRAMES = 4000
 VIDEO_TAIL_SECS = 12.0
