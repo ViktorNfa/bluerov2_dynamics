@@ -104,7 +104,6 @@ from fossen import ...
 > }
 > ```
 
-
 ### 4) Dependencies
 
 ```pyproject.toml``` already install all the main dependencies, but in case it fails, the core stack is light-weight:
@@ -114,6 +113,14 @@ pip install numpy scipy scikit-learn pandas matplotlib torch rosbags
 ```
 
 If you plan to export MP4 animations, install ```ffmpeg``` and ensure it’s on your system ```PATH```.
+
+> [!NOTE]
+> There is also a ```uv.lock``` file for those that want specific dependencies, use it with
+> ```bash
+> uv venv
+> uv sync
+> uv pip install -e .
+> ```
 
 
 ## 📦 Data
