@@ -23,6 +23,8 @@ import pandas as pd
 
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import get_types_from_idl, get_types_from_msg
+from rosbags.typesys import Stores, get_typestore
+
 
 # ======================= USER SETTINGS =======================
 BAG_PATH = Path(__file__).parent / "rosbag2_2025_11_06" / "rosbag2_2025_11_06-manual"
@@ -47,6 +49,16 @@ CUSTOM_TYPE_DIRS = [Path(__file__).parent / "types"]
 RESAMPLE_HZ = 50
 OUT_BASENAME = "koopman_dataset_50Hz"
 WRITE_PARQUET = False
+
+def _make_default_typestore():
+    for s in (Stores.ROS2_HUMBLE, Stores.ROS2_GALACTIC, Stores.ROS2_FOXY):
+        try:
+            return get_typestore(s)
+        except Exception:
+            pass
+    return get_typestore(Stores.ROS2_FOXY)
+
+DEFAULT_TYPESTORE = _make_default_typestore()
 
 # Video
 MAKE_VIDEO = True
@@ -169,7 +181,7 @@ def read_bag():
     odom_rows: list[OdomRow] = []
     motor_rows: list[dict] = []
 
-    with AnyReader([bag_path]) as reader:
+    with AnyReader([bag_path], default_typestore=DEFAULT_TYPESTORE) as reader:
         register_custom_types(reader.typestore)
         dbg_px4 = [k for k in reader.typestore.fielddefs.keys() if k.startswith("px4_msgs/msg/")]
         if dbg_px4:

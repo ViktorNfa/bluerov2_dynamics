@@ -46,6 +46,17 @@ git lfs install
 
 ### 2) Environment
 
+I recommend to install uv to manage the virtual environment (venv), so you just have to:
+```bash
+# 1) Install uv (once)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2) Create and activate a local virtual environment
+uv venv
+source .venv/bin/activate
+```
+
+If you don't want uv you can also just use venv:
 ```bash
 # (Windows, macOS, Linux)
 python -m venv .venv
@@ -58,20 +69,41 @@ python -m pip install --upgrade pip
 ```
 
 ### 3) Install
+If you use uv you can install the project (editable) + dependencies from pyproject.toml as:
+```bash
+uv pip install -e .
+```
 
-You can use the ```pyproject.toml``` file and install it in editable mode as:
-
+Or you can also install it manually as:
 ```bash
 pip install -e .
 ```
 
-This makes the code importable anywhere in the repo, e.g.
-
+This makes the code importable anywhere in the repo, e.g.,
 ```bash
 from Koopman.koopmanEDMDc import KoopmanEDMDc
 # and/or
 from fossen import ...
 ```
+
+> [!NOTE]
+> If you are running the code from VSCode remember to change the python executable
+> from the default `/bin/python` to the one in your `.venv` file.
+>
+> This can be done manually using:
+> 1. Open Command Palette → **Python: Select Interpreter**
+> 2. Pick: `.../bluerov2_dynamics/.venv/bin/python`
+> 3. Then the Run/Play button will use the venv and the import will work.
+>
+> Or automatically, by creating a `bluerov2_dynamics/.vscode/settings.json`
+> file with the following inside:
+>
+> ```json
+> {
+>   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+> }
+> ```
+
 
 ### 4) Dependencies
 

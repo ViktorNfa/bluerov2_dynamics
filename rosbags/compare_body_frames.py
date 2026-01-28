@@ -26,6 +26,8 @@ import pandas as pd
 
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import get_types_from_idl, get_types_from_msg
+from rosbags.typesys import Stores, get_typestore
+
 
 # ----------- USER: adjust only if your topic names differ -----------
 MOCAP_ODOM = "/mocap/itrl_rov_1/odom"                   # nav_msgs/msg/Odometry
@@ -34,6 +36,16 @@ PX4_VODOM  = "/itrl_rov_1/fmu/out/vehicle_odometry"     # px4_msgs/msg/VehicleOd
 
 # Merge tolerance (seconds) for aligning streams
 ALIGN_TOL = 0.02  # 20 ms is fine at ~100 Hz
+
+def _make_default_typestore():
+    for s in (Stores.ROS2_HUMBLE, Stores.ROS2_GALACTIC, Stores.ROS2_FOXY):
+        try:
+            return get_typestore(s)
+        except Exception:
+            pass
+    return get_typestore(Stores.ROS2_HUMBLE)
+
+DEFAULT_TYPESTORE = _make_default_typestore()
 
 # Where .msg/.idl live, if needed for px4_msgs types
 def _custom_type_dirs(script_path: Path):
@@ -77,7 +89,7 @@ def register_custom_types(typestore, base_dirs):
 
 # ----------------- main extraction -----------------
 def read_streams(bag_path: Path):
-    with AnyReader([bag_path]) as reader:
+    with AnyReader([bag_path], default_typestore=DEFAULT_TYPESTORE) as reader:
         register_custom_types(reader.typestore, _custom_type_dirs(Path(__file__)))
         conns = {c.topic: c for c in reader.connections}
         if MOCAP_ODOM not in conns:
