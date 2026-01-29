@@ -11,7 +11,7 @@ Simplifications compared to the full version:
   - No thruster model (no geometry, no thrust curve, no lag).
   - No tether model.
   - Input is directly a body-frame wrench tau.
-  - Hydrodynamics (added mass, damping, restoring) kept from von Benzon et al.
+  - Hydrodynamics (added mass, damping, restoring) kept from von Benzon et al with some changes (see comments).
 """
 
 import numpy as np
@@ -163,11 +163,11 @@ class BlueROV2:
         CRB[2, 4] = -self.m * u
         CRB[3, 1] =  self.m * w
         CRB[3, 2] = -self.m * v
-        CRB[3, 4] =  self.Iz * r # I think this term is wrong in the paper, based on Fossen Eq. 3.60
+        CRB[3, 4] =  self.Iz * r # This term is wrong in the paper, but I corrected it based on Fossen Eq. 3.60
         CRB[3, 5] = -self.Iy * q
         CRB[4, 0] = -self.m * w
         CRB[4, 2] =  self.m * u
-        CRB[4, 3] = -self.Iz * r # I think this term is wrong in the paper, based on Fossen Eq. 3.60
+        CRB[4, 3] = -self.Iz * r # This term is wrong in the paper, but I corrected it based on Fossen Eq. 3.60
         CRB[4, 5] =  self.Ix * p
         CRB[5, 0] =  self.m * v
         CRB[5, 1] = -self.m * u
@@ -232,7 +232,7 @@ class BlueROV2:
         return gvec
 
     # ------------------------------ API ------------------------------
-    def dynamics(self, x, tau_body, dt):
+    def dynamics(self, x, tau_body, dt=0.02):
         """
         Continuous-time dynamics:
 
@@ -247,7 +247,7 @@ class BlueROV2:
 
         # 1) unpack
         eta = x[0:6]
-        nu  = x[6:12]
+        nu = x[6:12]
         phi, theta, psi = eta[3:6]
 
         # 2) transforms
