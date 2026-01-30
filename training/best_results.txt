@@ -1011,3 +1011,19 @@ t=3.92s: K pred=( 6.610,  1.097,  1.664) ang=(-11.81,  10.19,  1236.00) | true=(
 t=3.94s: K pred=( 6.609,  1.097,  1.664) ang=(-11.88,  10.24,  1234.65) | true=( 6.575,  1.078,  1.611) ang=(-16.17,  12.85,  1253.87)
 t=3.96s: K pred=( 6.608,  1.096,  1.665) ang=(-11.93,  10.26,  1233.27) | true=( 6.573,  1.078,  1.611) ang=(-16.25,  12.95,  1252.73)
 t=3.98s: K pred=( 6.607,  1.096,  1.666) ang=(-11.98,  10.27,  1231.88) | true=( 6.572,  1.078,  1.611) ang=(-16.34,  12.99,  1251.89)
+
+
+
+bluerov2_dynamics>python3.13.exe bluerov2_dynamics/rosbags/T200/T200_fit_polynomial.py
+[i] Reading: bluerov2_dynamics/rosbags/T200/T200-Public-Performance-Data-10-20V-September-2019.xlsx
+[i] Using sheet: 16 V
+[i] Sheet rows: 201 cols: 7
+[i] PWM column:  PWM (µs)
+[i] Thrust column:  Force (Kg f)
+
+[ok] Fitted coefficients (plugin format: [a0, a1, a2, a3, a4, a5])
+positiveThrustPolynomial = [ 1.56126574e-02, -9.35153055e+00,  2.08830810e+02, -4.15509637e+02,
+  4.44776674e+02, -1.76771528e+02]
+negativeThrustPolynomial = [ 1.59248426e-03, -6.81757549e+00,  1.66237012e+02, -3.43638683e+02,
+  3.80069467e+02, -1.55688898e+02]
+[ok] Saved plot: bluerov2_dynamics/rosbags/T200/T200_16V_thrust_polynomial_fit.png

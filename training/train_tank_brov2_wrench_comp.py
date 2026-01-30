@@ -426,8 +426,9 @@ def main():
     #  4)  Short open-loop demo (Koopman vs Fossen vs DI vs True)
     # ------------------------------------------------------------------
     horizon = min(OPEN_LOOP_STEPS, len(X_test) - 1)
-    x0 = X_test[0]
-    U_seq = U_test[:horizon]
+    start = int(0 * (len(X_test) - horizon))
+    x0 = X_test[start]
+    U_seq = U_test[start:start+horizon]
 
     # Koopman rollout
     predK = model.simulate(x0, U_seq)                       # (horizon+1, 12)
@@ -438,7 +439,7 @@ def main():
     predD = simulate_double_integrator(x0, U_seq, dt, K_lin, K_ang)
 
     # Truth
-    true_traj = X_test[:horizon+1]
+    true_traj = X_test[start:start+horizon+1]
 
     Path("media").mkdir(exist_ok=True)
     animate_xy_four(
