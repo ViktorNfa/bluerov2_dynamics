@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 # ---------- locate XLSX robustly ----------
 HERE = Path(__file__).parent
 XLSX = HERE / "T200-Public-Performance-Data-10-20V-September-2019.xlsx"
-OUT_PNG = HERE / "T200_16V_thrust_polynomial_fit.png"
 
 # ---------- plugin settings (from gz SDF) ----------
 MIN_PWM = 1100.0
@@ -32,23 +31,27 @@ class FitResult:
     neg_coeff: np.ndarray
 
 
-def _find_sheet_name(xls: pd.ExcelFile) -> str:
+def _find_sheet_name(xls: pd.ExcelFile, voltage_v: int) -> str:
     """
-    Prefer a sheet that looks like '16V' / '16 V' / '16v'.
-    Fall back to any sheet containing '16' and 'V'.
+    Prefer a sheet that looks like '16V' / '16 V' / '16v' (and similarly for other voltages).
+    Fall back to any sheet containing the voltage number and 'V'.
     """
     names = xls.sheet_names
+    v = str(voltage_v)
+
     # exact-ish matches first
-    for key in ("16V", "16 V", "16v", "16 v"):
+    for key in (f"{v}V", f"{v} V", f"{v}v", f"{v} v"):
         for n in names:
             if n.strip().lower() == key.strip().lower():
                 return n
+
     # fuzzy
     for n in names:
         s = n.strip().lower().replace(" ", "")
-        if "16" in s and "v" in s:
+        if v in s and "v" in s:
             return n
-    raise ValueError(f"Could not find a 16V sheet. Available sheets: {names}")
+
+    raise ValueError(f"Could not find a {v}V sheet. Available sheets: {names}")
 
 
 def _guess_columns(df: pd.DataFrame) -> Tuple[str, str]:
@@ -159,90 +162,94 @@ def main() -> None:
 
     print("[i] Reading:", XLSX.as_posix())
     xls = pd.ExcelFile(XLSX)
-    sheet = _find_sheet_name(xls)
-    print("[i] Using sheet:", sheet)
 
-    df = pd.read_excel(XLSX, sheet_name=sheet)
+    for V in (14, 16, 18, 20):
+        sheet = _find_sheet_name(xls, V)
+        out_png = HERE / f"T200_{V}V_thrust_polynomial_fit.png"
 
-    # Drop fully-empty rows
-    df = df.dropna(how="all").copy()
-    print("[i] Sheet rows:", len(df), "cols:", len(df.columns))
+        print("\n[i] Using sheet:", sheet)
 
-    pwm_col, thrust_col = _guess_columns(df)
-    print("[i] PWM column:", pwm_col)
-    print("[i] Thrust column:", thrust_col)
+        df = pd.read_excel(XLSX, sheet_name=sheet)
 
-    pwm = pd.to_numeric(df[pwm_col], errors="coerce").to_numpy(dtype=float)
-    thrust_kgf = pd.to_numeric(df[thrust_col], errors="coerce").to_numpy(dtype=float)
+        # Drop fully-empty rows
+        df = df.dropna(how="all").copy()
+        print("[i] Sheet rows:", len(df), "cols:", len(df.columns))
 
-    # Keep only PWM within your plugin range, so the fit matches what you will command
-    m = np.isfinite(pwm) & np.isfinite(thrust_kgf) & (pwm >= MIN_PWM) & (pwm <= MAX_PWM)
-    pwm = pwm[m]
-    thrust_kgf = thrust_kgf[m]
+        pwm_col, thrust_col = _guess_columns(df)
+        print("[i] PWM column:", pwm_col)
+        print("[i] Thrust column:", thrust_col)
 
-    # Sort by PWM for nicer plots
-    order = np.argsort(pwm)
-    pwm = pwm[order]
-    thrust_kgf = thrust_kgf[order]
+        pwm = pd.to_numeric(df[pwm_col], errors="coerce").to_numpy(dtype=float)
+        thrust_kgf = pd.to_numeric(df[thrust_col], errors="coerce").to_numpy(dtype=float)
 
-    # ---------- fit ----------
-    fit = fit_forward_reverse(pwm, thrust_kgf)
+        # Keep only PWM within your plugin range, so the fit matches what you will command
+        m = np.isfinite(pwm) & np.isfinite(thrust_kgf) & (pwm >= MIN_PWM) & (pwm <= MAX_PWM)
+        pwm = pwm[m]
+        thrust_kgf = thrust_kgf[m]
 
-    # Print coefficients in the exact SDF list format:
-    #   positiveThrustPolynomial -> forward magnitude, Newtons
-    #   negativeThrustPolynomial -> reverse magnitude, Newtons
-    print("\n[ok] Fitted coefficients (plugin format: [a0, a1, a2, a3, a4, a5])")
-    print("positiveThrustPolynomial =", np.array2string(fit.pos_coeff, separator=", "))
-    print("negativeThrustPolynomial =", np.array2string(fit.neg_coeff, separator=", "))
+        # Sort by PWM for nicer plots
+        order = np.argsort(pwm)
+        pwm = pwm[order]
+        thrust_kgf = thrust_kgf[order]
 
-    # ---------- plot on PWM axis in kgf ----------
-    # Create dense PWM axis for lines
-    pwm_grid = np.linspace(MIN_PWM, MAX_PWM, 801)
-    u_grid = pwm_to_u(pwm_grid)
+        # ---------- fit ----------
+        fit = fit_forward_reverse(pwm, thrust_kgf)
 
-    # Evaluate piecewise (magnitudes, then apply sign to get kgf)
-    g0 = 9.80665
+        # Print coefficients in the exact SDF list format:
+        #   positiveThrustPolynomial -> forward magnitude, Newtons
+        #   negativeThrustPolynomial -> reverse magnitude, Newtons
+        print(f"\n[ok] Fitted coefficients @ {V}V (plugin format: [a0, a1, a2, a3, a4, a5])")
+        print("positiveThrustPolynomial =", np.array2string(fit.pos_coeff, separator=", "))
+        print("negativeThrustPolynomial =", np.array2string(fit.neg_coeff, separator=", "))
 
-    y_fit_N = np.zeros_like(u_grid, dtype=float)
-    pos = u_grid >= 0
-    neg = u_grid < 0
+        # ---------- plot on PWM axis in kgf ----------
+        # Create dense PWM axis for lines
+        pwm_grid = np.linspace(MIN_PWM, MAX_PWM, 801)
+        u_grid = pwm_to_u(pwm_grid)
 
-    # forward: + poly_pos(u)
-    y_fit_N[pos] = eval_poly_asc(fit.pos_coeff, u_grid[pos])
+        # Evaluate piecewise (magnitudes, then apply sign to get kgf)
+        g0 = 9.80665
 
-    # reverse: - poly_neg(|u|)
-    y_fit_N[neg] = -eval_poly_asc(fit.neg_coeff, -u_grid[neg])
+        y_fit_N = np.zeros_like(u_grid, dtype=float)
+        pos = u_grid >= 0
+        neg = u_grid < 0
 
-    y_fit_kgf = y_fit_N / g0
+        # forward: + poly_pos(u)
+        y_fit_N[pos] = eval_poly_asc(fit.pos_coeff, u_grid[pos])
 
-    # Measured forward/reverse split
-    is_fwd = pwm >= MID_PWM
-    is_rev = pwm < MID_PWM
+        # reverse: - poly_neg(|u|)
+        y_fit_N[neg] = -eval_poly_asc(fit.neg_coeff, -u_grid[neg])
 
-    # Colors
-    c_meas_fwd = "#0b3d91"   # dark blue
-    c_meas_rev = "#7fb3ff"   # light blue
-    c_fit_fwd  = "#1b7f1b"   # green (darker)
-    c_fit_rev  = "#6fdc6f"   # green (lighter)
+        y_fit_kgf = y_fit_N / g0
 
-    plt.figure()
-    plt.scatter(pwm[is_fwd], thrust_kgf[is_fwd], s=18, color=c_meas_fwd, label="Measured (forward)")
-    plt.scatter(pwm[is_rev], thrust_kgf[is_rev], s=18, color=c_meas_rev, label="Measured (reverse)")
+        # Measured forward/reverse split
+        is_fwd = pwm >= MID_PWM
+        is_rev = pwm < MID_PWM
 
-    # Plot fitted lines split for clearer legend/coloring
-    plt.plot(pwm_grid[pos], y_fit_kgf[pos], color=c_fit_fwd, linewidth=2.0, label="Fitted (forward)")
-    plt.plot(pwm_grid[neg], y_fit_kgf[neg], color=c_fit_rev, linewidth=2.0, label="Fitted (reverse)")
+        # Colors
+        c_meas_fwd = "#0b3d91"   # dark blue
+        c_meas_rev = "#7fb3ff"   # light blue
+        c_fit_fwd  = "#1b7f1b"   # green (darker)
+        c_fit_rev  = "#6fdc6f"   # green (lighter)
 
-    plt.xlim(MIN_PWM, MAX_PWM)
-    plt.xlabel("PWM (µs)")
-    plt.ylabel("Thrust (kgf)")
-    plt.title(f"T200 Thrust Fit @ 16V (fit domain: PWM {int(MIN_PWM)}–{int(MAX_PWM)})")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(OUT_PNG, dpi=200)
-    print("[ok] Saved plot:", OUT_PNG.as_posix())
-    plt.show()
+        plt.figure()
+        plt.scatter(pwm[is_fwd], thrust_kgf[is_fwd], s=18, color=c_meas_fwd, label="Measured (forward)")
+        plt.scatter(pwm[is_rev], thrust_kgf[is_rev], s=18, color=c_meas_rev, label="Measured (reverse)")
+
+        # Plot fitted lines split for clearer legend/coloring
+        plt.plot(pwm_grid[pos], y_fit_kgf[pos], color=c_fit_fwd, linewidth=2.0, label="Fitted (forward)")
+        plt.plot(pwm_grid[neg], y_fit_kgf[neg], color=c_fit_rev, linewidth=2.0, label="Fitted (reverse)")
+
+        plt.xlim(MIN_PWM, MAX_PWM)
+        plt.xlabel("PWM (µs)")
+        plt.ylabel("Thrust (kgf)")
+        plt.title(f"T200 Thrust Fit @ {V}V (fit domain: PWM {int(MIN_PWM)}–{int(MAX_PWM)})")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(out_png, dpi=200)
+        print("[ok] Saved plot:", out_png.as_posix())
+        plt.show()
 
 
 if __name__ == "__main__":
