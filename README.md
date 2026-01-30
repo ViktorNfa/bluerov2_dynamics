@@ -109,7 +109,7 @@ from fossen import ...
 ```pyproject.toml``` already install all the main dependencies, but in case it fails, the core stack is light-weight:
 
 ```bash
-pip install numpy scipy scikit-learn pandas matplotlib torch rosbags
+pip install numpy scipy scikit-learn pandas matplotlib torch rosbags openpyxl
 ```
 
 If you plan to export MP4 animations, install ```ffmpeg``` and ensure it’s on your system ```PATH```.

@@ -15,7 +15,7 @@ HERE = Path(__file__).parent
 XLSX = HERE / "T200-Public-Performance-Data-10-20V-September-2019.xlsx"
 OUT_PNG = HERE / "T200_16V_thrust_polynomial_fit.png"
 
-# ---------- plugin settings (from your SDF) ----------
+# ---------- plugin settings (from gz SDF) ----------
 MIN_PWM = 1100.0
 MAX_PWM = 1900.0
 MID_PWM = 0.5 * (MIN_PWM + MAX_PWM)  # 1500
@@ -80,7 +80,7 @@ def _guess_columns(df: pd.DataFrame) -> Tuple[str, str]:
         raise ValueError(f"Could not identify PWM column. Columns: {cols}")
 
     # Thrust/force in kgf candidates:
-    # your file has "Force (Kg f)" -> normalized becomes "forcekgf"
+    # excel file has "Force (Kg f)" -> normalized becomes "forcekgf"
     thrust_col = (
         find_any(lambda s: ("force" in s or "thrust" in s) and "kgf" in s)
         or find_any(lambda s: "kgf" in s)
@@ -219,7 +219,7 @@ def main() -> None:
     is_fwd = pwm >= MID_PWM
     is_rev = pwm < MID_PWM
 
-    # Colors (as requested)
+    # Colors
     c_meas_fwd = "#0b3d91"   # dark blue
     c_meas_rev = "#7fb3ff"   # light blue
     c_fit_fwd  = "#1b7f1b"   # green (darker)
