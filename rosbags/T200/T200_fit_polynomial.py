@@ -163,7 +163,7 @@ def main() -> None:
     print("[i] Reading:", XLSX.as_posix())
     xls = pd.ExcelFile(XLSX)
 
-    for V in (14, 16, 18, 20):
+    for V in (16, 18, 20):
         sheet = _find_sheet_name(xls, V)
         out_png = HERE / f"T200_{V}V_thrust_polynomial_fit.png"
 
@@ -182,7 +182,7 @@ def main() -> None:
         pwm = pd.to_numeric(df[pwm_col], errors="coerce").to_numpy(dtype=float)
         thrust_kgf = pd.to_numeric(df[thrust_col], errors="coerce").to_numpy(dtype=float)
 
-        # Keep only PWM within your plugin range, so the fit matches what you will command
+        # Keep only PWM within gz plugin range, so the fit matches what is commanded
         m = np.isfinite(pwm) & np.isfinite(thrust_kgf) & (pwm >= MIN_PWM) & (pwm <= MAX_PWM)
         pwm = pwm[m]
         thrust_kgf = thrust_kgf[m]
