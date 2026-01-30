@@ -1014,16 +1014,41 @@ t=3.98s: K pred=( 6.607,  1.096,  1.666) ang=(-11.98,  10.27,  1231.88) | true=(
 
 
 
-bluerov2_dynamics>python3.13.exe bluerov2_dynamics/rosbags/T200/T200_fit_polynomial.py
+(bluerov2_dynamics) bluerov2_dynamics$ bluerov2_dynamics/.venv/bin/python Github/bluerov2_dynamics/rosbags/T200/T200_fit_polynomial.py
 [i] Reading: bluerov2_dynamics/rosbags/T200/T200-Public-Performance-Data-10-20V-September-2019.xlsx
+
 [i] Using sheet: 16 V
 [i] Sheet rows: 201 cols: 7
 [i] PWM column:  PWM (µs)
 [i] Thrust column:  Force (Kg f)
 
-[ok] Fitted coefficients (plugin format: [a0, a1, a2, a3, a4, a5])
+[ok] Fitted coefficients @ 16V (plugin format: [a0, a1, a2, a3, a4, a5])
 positiveThrustPolynomial = [ 1.56126574e-02, -9.35153055e+00,  2.08830810e+02, -4.15509637e+02,
   4.44776674e+02, -1.76771528e+02]
 negativeThrustPolynomial = [ 1.59248426e-03, -6.81757549e+00,  1.66237012e+02, -3.43638683e+02,
   3.80069467e+02, -1.55688898e+02]
 [ok] Saved plot: bluerov2_dynamics/rosbags/T200/T200_16V_thrust_polynomial_fit.png
+
+[i] Using sheet: 18 V
+[i] Sheet rows: 201 cols: 7
+[i] PWM column:  PWM (µs)
+[i] Thrust column:  Force (Kg f)
+
+[ok] Fitted coefficients @ 18V (plugin format: [a0, a1, a2, a3, a4, a5])
+positiveThrustPolynomial = [ 6.11750784e-02, -1.04874827e+01,  2.33708779e+02, -5.09567410e+02,
+  5.83718240e+02, -2.37921148e+02]
+negativeThrustPolynomial = [ 2.84439112e-04, -6.91792134e+00,  1.85083311e+02, -4.03797031e+02,
+  4.62767807e+02, -1.91889602e+02]
+[ok] Saved plot: bluerov2_dynamics/rosbags/T200/T200_18V_thrust_polynomial_fit.png
+
+[i] Using sheet: 20 V
+[i] Sheet rows: 201 cols: 7
+[i] PWM column:  PWM (µs)
+[i] Thrust column:  Force (Kg f)
+
+[ok] Fitted coefficients @ 20V (plugin format: [a0, a1, a2, a3, a4, a5])
+positiveThrustPolynomial = [-2.20545111e-01,  2.37936891e+00,  1.49248519e+02, -3.27398031e+02,
+  4.36609803e+02, -1.94364029e+02]
+negativeThrustPolynomial = [-1.25983096e-01,  3.42623942e-01,  1.34413692e+02, -2.84606487e+02,
+  3.51715475e+02, -1.52174269e+02]
+[ok] Saved plot: bluerov2_dynamics/rosbags/T200/T200_20V_thrust_polynomial_fit.png
