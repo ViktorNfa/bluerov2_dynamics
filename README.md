@@ -200,11 +200,13 @@ This project is released under the license specified in [LICENSE](LICENSE).
 If this work supports your research, please cite it. Example BibTeX:
 
 ```bibtex
-@software{bluerov2_koopman_fossen,
-  title        = {BlueROV2 Koopman and Fossen Dynamics},
-  author       = {Nan Fernandez-Ayala, Victor},
-  year         = {2026},
-  url          = {https://github.com/KTH-DHSG/bluerov2_koopman},
-  note         = {Version 0.1.0}
+@misc{torroba2026marinariumnewarenabring,
+      title={Marinarium: a New Arena to Bring Maritime Robotics Closer to Shore}, 
+      author={Ignacio Torroba and David Dorner and Victor Nan Fernandez-Ayala and Mart Kartasev and Joris Verhagen and Elias Krantz and Gregorio Marchesini and Carl Ljung and Pedro Roque and Chelsea Sidrane and Linda Van der Spaa and Nicola De Carli and Petter Ogren and Christer Fuglesang and Jana Tumova and Dimos V. Dimarogonas and Ivan Stenius},
+      year={2026},
+      eprint={2602.23053},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2602.23053}, 
 }
 ```
